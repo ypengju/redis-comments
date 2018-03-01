@@ -45,13 +45,13 @@ typedef char *sds;
  * However is here to document the layout of type 5 SDS strings. */
 struct __attribute__ ((__packed__)) sdshdr5 {
     unsigned char flags; /* 3 lsb of type, and 5 msb of string length */
-    char buf[];
+    char buf[]; //字节数组，redis用其报错一系列二进制数，而不是专门只保存字符
 };
 struct __attribute__ ((__packed__)) sdshdr8 {
-    uint8_t len; /* used */
-    uint8_t alloc; /* excluding the header and null terminator */
-    unsigned char flags; /* 3 lsb of type, 5 unused bits */
-    char buf[];
+    uint8_t len; /* used */ /* 表示字符串的真是长度 */
+    uint8_t alloc; /* excluding the header and null terminator */ /* 申请的内存长度，包括1byte '\0' */
+    unsigned char flags; /* 3 lsb of type, 5 unused bits */ /* 标记结构类型，只用了三个位 */
+    char buf[]; /* 存字符串的数组 */
 };
 struct __attribute__ ((__packed__)) sdshdr16 {
     uint16_t len; /* used */
@@ -72,12 +72,15 @@ struct __attribute__ ((__packed__)) sdshdr64 {
     char buf[];
 };
 
-#define SDS_TYPE_5  0
+/* 存取不同长度字符的结构类型，一共有五种 分别表示可以存多大长度的字符串
+ * SDS_TYPE_MASK 使用来按位&的 因为只有五中类型，所以只要三个位就够了
+*/
+#define SDS_TYPE_5  0 
 #define SDS_TYPE_8  1
 #define SDS_TYPE_16 2
 #define SDS_TYPE_32 3
 #define SDS_TYPE_64 4
-#define SDS_TYPE_MASK 7
+#define SDS_TYPE_MASK 7 //0000 0111
 #define SDS_TYPE_BITS 3
 #define SDS_HDR_VAR(T,s) struct sdshdr##T *sh = (void*)((s)-(sizeof(struct sdshdr##T)));
 #define SDS_HDR(T,s) ((struct sdshdr##T *)((s)-(sizeof(struct sdshdr##T))))

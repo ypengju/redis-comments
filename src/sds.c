@@ -39,22 +39,30 @@
 #include "sds.h"
 #include "sdsalloc.h"
 
+/* 根据结构类型，获取结构大小 */
 static inline int sdsHdrSize(char type) {
     switch(type&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
-            return sizeof(struct sdshdr5);
+            return sizeof(struct sdshdr5); /* 1 */
         case SDS_TYPE_8:
-            return sizeof(struct sdshdr8);
+            return sizeof(struct sdshdr8); /* 3 */
         case SDS_TYPE_16:
-            return sizeof(struct sdshdr16);
+            return sizeof(struct sdshdr16); /* 5 */
         case SDS_TYPE_32:
-            return sizeof(struct sdshdr32);
+            return sizeof(struct sdshdr32); /* 9 */
         case SDS_TYPE_64:
-            return sizeof(struct sdshdr64);
+            return sizeof(struct sdshdr64); /* 17 */
     }
     return 0;
 }
 
+/* 根据c字符串长度来选择使用那种sds结构来存储最优 
+ * 0 < SDS_TYPE_5 < 32
+ * 32 <= SDS_TYPE_8 < 256 
+ * 256 <= SDS_TYPE_16 < 65536
+ * 65536 <= SDS_TYPE_32 < 4294967296
+ * 4294967296 <= SDS_TYPE_64 
+*/
 static inline char sdsReqType(size_t string_size) {
     if (string_size < 1<<5)
         return SDS_TYPE_5;
@@ -68,6 +76,14 @@ static inline char sdsReqType(size_t string_size) {
 #endif
     return SDS_TYPE_64;
 }
+
+/* 使用传递的指针和字符串长度，创建一个sds
+ * 如果指针为空，则sds占用0个字节
+ * sds保持了与c字符串的兼容，也是以'\0'结尾，这样在做字符串操作时，就可以复用
+ * 系统的string.h中的函数，而不用自己再实现一遍。
+ * sds 是二进制安全的，也就是说其可以存储任何类型数据，即使字符串中间有'\0'字符。
+ * sds 有单独的用于保存长度，这样在获取长度时可使时间复杂度变为O(1).
+*/
 
 /* Create a new sds string with the content specified by the 'init' pointer
  * and 'initlen'.
@@ -143,6 +159,7 @@ sds sdsempty(void) {
     return sdsnewlen("",0);
 }
 
+/* 用c字符串创建一个sds 动态字符串 */
 /* Create a new sds string starting from a null terminated C string. */
 sds sdsnew(const char *init) {
     size_t initlen = (init == NULL) ? 0 : strlen(init);
