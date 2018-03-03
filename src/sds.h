@@ -33,7 +33,7 @@
 #ifndef __SDS_H
 #define __SDS_H
 
-#define SDS_MAX_PREALLOC (1024*1024) //
+#define SDS_MAX_PREALLOC (1024*1024) //1M
 
 #include <sys/types.h>
 #include <stdarg.h>
@@ -81,13 +81,17 @@ struct __attribute__ ((__packed__)) sdshdr64 {
 #define SDS_TYPE_32 3
 #define SDS_TYPE_64 4
 #define SDS_TYPE_MASK 7 //0000 0111
-#define SDS_TYPE_BITS 3
+#define SDS_TYPE_BITS 3 //SDS_TYPE_5会左移三位，高5位保存长度 低三位保存类型
+/* 创建指定类型的结构的指针，指向s字符串所在的结构地址 */
 #define SDS_HDR_VAR(T,s) struct sdshdr##T *sh = (void*)((s)-(sizeof(struct sdshdr##T)));
+/* s为buf数组的开始地址，所以减去对应sdshdr结构的大小，就是sdshdr结构的地址 */
 #define SDS_HDR(T,s) ((struct sdshdr##T *)((s)-(sizeof(struct sdshdr##T))))
+/* SDS_TYPE_5的长度， f为flags */
 #define SDS_TYPE_5_LEN(f) ((f)>>SDS_TYPE_BITS)
 
+/* 获取sds字符串的长度 SDS_TYPE_5的长度比较特殊，其他类型直接获取len值就可以了*/
 static inline size_t sdslen(const sds s) {
-    unsigned char flags = s[-1];
+    unsigned char flags = s[-1]; /* s地址的上一字节就是flags */
     switch(flags&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
             return SDS_TYPE_5_LEN(flags);
@@ -103,6 +107,7 @@ static inline size_t sdslen(const sds s) {
     return 0;
 }
 
+/* 验证当前sds是否还可以存，返回可存的空间大小 */
 static inline size_t sdsavail(const sds s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -129,6 +134,7 @@ static inline size_t sdsavail(const sds s) {
     return 0;
 }
 
+/* 设置sds的长度，SDS_TYPE_5比较特殊，其重置了flags中的值 */
 static inline void sdssetlen(sds s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -178,6 +184,7 @@ static inline void sdsinclen(sds s, size_t inc) {
     }
 }
 
+/* 获取sds buf申请空间的大小*/
 /* sdsalloc() = sdsavail() + sdslen() */
 static inline size_t sdsalloc(const sds s) {
     unsigned char flags = s[-1];
@@ -196,6 +203,7 @@ static inline size_t sdsalloc(const sds s) {
     return 0;
 }
 
+/* 设置申请buf空间的大小  SDS_TYPE_5没有存储申请空间的大小变量*/
 static inline void sdssetalloc(sds s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
