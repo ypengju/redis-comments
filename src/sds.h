@@ -36,7 +36,7 @@
 #define SDS_MAX_PREALLOC (1024*1024) //1M
 
 #include <sys/types.h>
-#include <stdarg.h>
+#include <stdarg.h> /* 处理可变参数 */
 #include <stdint.h>
 
 typedef char *sds;
