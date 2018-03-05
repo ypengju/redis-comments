@@ -739,6 +739,7 @@ sds sdscatfmt(sds s, char const *fmt, ...) {
     return s;
 }
 
+/* 删除sds前后两端 所有在cset中的字符 之后移动中间的字符，重新设置长度*/
 /* Remove the part of the string from left and from right composed just of
  * contiguous characters found in 'cset', that is a null terminted C string.
  *
@@ -863,6 +864,10 @@ int sdscmp(const sds s1, const sds s2) {
     return cmp;
 }
 
+/* 使用sep分割字符串s，分割的子字符串转换成sds，最终的结果是返回sds组成的数组
+ * count指针所指内存中保存最终数组的大小
+ * 溢出，字符串长度为0 或者 分割符长度为零，则返回NULL
+ */
 /* Split 's' with separator in 'sep'. An array
  * of sds strings is returned. *count will be set
  * by reference to the number of tokens returned.
@@ -929,7 +934,7 @@ cleanup:
     }
 }
 
-/* 释放被 sdssplitlen函数 返回的结果 如果tokens为空，不做任何操作 */
+/* 释放被 sdssplitlen函数 返回的数组 如果tokens为空，不做任何操作 */
 /* Free the result returned by sdssplitlen(), or do nothing if 'tokens' is NULL. */
 void sdsfreesplitres(sds *tokens, int count) {
     if (!tokens) return;
