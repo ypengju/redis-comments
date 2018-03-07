@@ -38,49 +38,56 @@
 #ifndef __DICT_H
 #define __DICT_H
 
-#define DICT_OK 0
-#define DICT_ERR 1
+#define DICT_OK 0 /* 字典操作成功的返回值 */
+#define DICT_ERR 1 /* 字典操作失败的返回值 */
 
 /* Unused arguments generate annoying warnings... */
 #define DICT_NOTUSED(V) ((void) V)
 
+/* 哈希表的节点，存储键值对的结构 */
 typedef struct dictEntry {
-    void *key;
+    void *key; /* key用于存储键的指针 */
     union {
         void *val;
         uint64_t u64;
         int64_t s64;
         double d;
-    } v;
-    struct dictEntry *next;
+    } v; /* v用于保存值，可以是具体值或者值的指针 */
+    struct dictEntry *next; /* next指向链表下一个节点 */
 } dictEntry;
 
+/* 字典的类型结构 */
 typedef struct dictType {
-    uint64_t (*hashFunction)(const void *key);
-    void *(*keyDup)(void *privdata, const void *key);
-    void *(*valDup)(void *privdata, const void *obj);
-    int (*keyCompare)(void *privdata, const void *key1, const void *key2);
-    void (*keyDestructor)(void *privdata, void *key);
-    void (*valDestructor)(void *privdata, void *obj);
+    uint64_t (*hashFunction)(const void *key); /* 哈希函数 */
+    void *(*keyDup)(void *privdata, const void *key); /* 键拷贝 */
+    void *(*valDup)(void *privdata, const void *obj); /* 值拷贝 */
+    int (*keyCompare)(void *privdata, const void *key1, const void *key2); /* 键比较 */
+    void (*keyDestructor)(void *privdata, void *key); /* 键析构 */
+    void (*valDestructor)(void *privdata, void *obj); /* 值析构 */
 } dictType;
 
+/* 哈希表结构 */
 /* This is our hash table structure. Every dictionary has two of this as we
  * implement incremental rehashing, for the old to the new table. */
 typedef struct dictht {
-    dictEntry **table;
-    unsigned long size;
-    unsigned long sizemask;
-    unsigned long used;
+    dictEntry **table; /* 保存键值对的数组 */
+    unsigned long size; /* 记录哈希表大小，也就是table数组大小 */
+    unsigned long sizemask; /* 大小为size-1, 与size配合决定键应该存在哪个表中 */
+    unsigned long used; /* 记录当前已有的键值对的数量 */
 } dictht;
 
+/* 字典结构 type和privdata是针对不同类型的键值对，redis会根据不同的字典用途设置不通过的type
+ * 函数，privadata保存了要传给这些函数的可选参数
+ */
 typedef struct dict {
-    dictType *type;
-    void *privdata;
-    dictht ht[2];
-    long rehashidx; /* rehashing not in progress if rehashidx == -1 */
-    unsigned long iterators; /* number of iterators currently running */
+    dictType *type; /* 各种处理函数 */
+    void *privdata; /* 私有数据 */
+    dictht ht[2]; /* 两个哈希表 */
+    long rehashidx; /* rehashing not in progress if rehashidx == -1 */ /* rehash索引 */
+    unsigned long iterators; /* number of iterators currently running */ /* 迭代 */
 } dict;
 
+/* 字典的迭代器 */
 /* If safe is set to 1 this is a safe iterator, that means, you can call
  * dictAdd, dictFind, and other functions against the dictionary even while
  * iterating. Otherwise it is a non safe iterator, and only dictNext()
@@ -97,6 +104,7 @@ typedef struct dictIterator {
 typedef void (dictScanFunction)(void *privdata, const dictEntry *de);
 typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
 
+/* 哈希表的初始大小 */
 /* This is the initial size of every hash table */
 #define DICT_HT_INITIAL_SIZE     4
 
@@ -137,7 +145,7 @@ typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
         (d)->type->keyCompare((d)->privdata, key1, key2) : \
         (key1) == (key2))
 
-#define dictHashKey(d, key) (d)->type->hashFunction(key)
+#define dictHashKey(d, key) (d)->type->hashFunction(key) /* 使用哈希函数，获取指定键对应的哈希值 */
 #define dictGetKey(he) ((he)->key)
 #define dictGetVal(he) ((he)->v.val)
 #define dictGetSignedIntegerVal(he) ((he)->v.s64)
@@ -145,7 +153,7 @@ typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
 #define dictGetDoubleVal(he) ((he)->v.d)
 #define dictSlots(d) ((d)->ht[0].size+(d)->ht[1].size)
 #define dictSize(d) ((d)->ht[0].used+(d)->ht[1].used)
-#define dictIsRehashing(d) ((d)->rehashidx != -1)
+#define dictIsRehashing(d) ((d)->rehashidx != -1) /* 判断字典是不是在rehash过程中 */
 
 /* API */
 dict *dictCreate(dictType *type, void *privDataPtr);

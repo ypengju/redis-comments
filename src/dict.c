@@ -59,8 +59,8 @@
  * Note that even when dict_can_resize is set to 0, not all resizes are
  * prevented: a hash table is still allowed to grow if the ratio between
  * the number of elements and the buckets > dict_force_resize_ratio. */
-static int dict_can_resize = 1;
-static unsigned int dict_force_resize_ratio = 5;
+static int dict_can_resize = 1; /* 标记字典是否可重置大小 */
+static unsigned int dict_force_resize_ratio = 5; /* 达到这个概率时，可强制进行resize */
 
 /* -------------------------- private prototypes ---------------------------- */
 
@@ -97,6 +97,7 @@ uint64_t dictGenCaseHashFunction(const unsigned char *buf, int len) {
 
 /* ----------------------------- API implementation ------------------------- */
 
+/* 哈希表重置 */
 /* Reset a hash table already initialized with ht_init().
  * NOTE: This function should only be called by ht_destroy(). */
 static void _dictReset(dictht *ht)
@@ -107,21 +108,23 @@ static void _dictReset(dictht *ht)
     ht->used = 0;
 }
 
+/* 创建一个字典 */
 /* Create a new hash table */
 dict *dictCreate(dictType *type,
         void *privDataPtr)
 {
-    dict *d = zmalloc(sizeof(*d));
+    dict *d = zmalloc(sizeof(*d)); /* 分配内存 */
 
     _dictInit(d,type,privDataPtr);
     return d;
 }
 
+/* 字典初始化 */
 /* Initialize the hash table */
 int _dictInit(dict *d, dictType *type,
         void *privDataPtr)
 {
-    _dictReset(&d->ht[0]);
+    _dictReset(&d->ht[0]); /* 初始化两个哈希表 */
     _dictReset(&d->ht[1]);
     d->type = type;
     d->privdata = privDataPtr;
@@ -176,6 +179,8 @@ int dictExpand(dict *d, unsigned long size)
     return DICT_OK;
 }
 
+/* 向前执行N步rehash，
+ */
 /* Performs N steps of incremental rehashing. Returns 1 if there are still
  * keys to move from the old to the new hash table, otherwise 0 is returned.
  *
@@ -261,6 +266,7 @@ static void _dictRehashStep(dict *d) {
     if (d->iterators == 0) dictRehash(d,1);
 }
 
+/* 往指定字典添加元素 */
 /* Add an element to the target hash table */
 int dictAdd(dict *d, void *key, void *val)
 {
@@ -271,6 +277,10 @@ int dictAdd(dict *d, void *key, void *val)
     return DICT_OK;
 }
 
+/* 低级别的添加和查找接口 
+ * 这个函数会尝试添加key对于的哈希实体，如果该key对应的哈希已经存在，返回NULL，existing参数带回已经存在的实体
+ * 否则添加哈希实体，返回该实体，
+*/
 /* Low level add or find:
  * This function adds the entry but instead of setting a value returns the
  * dictEntry structure to the user, that will make sure to fill the value
@@ -297,6 +307,7 @@ dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
 
     if (dictIsRehashing(d)) _dictRehashStep(d);
 
+    /* 获取新元素的下标，如果元素已经存在，返回-1 */
     /* Get the index of the new element, or -1 if
      * the element already exists. */
     if ((index = _dictKeyIndex(d, key, dictHashKey(d,key), existing)) == -1)
