@@ -109,10 +109,12 @@ typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
 #define DICT_HT_INITIAL_SIZE     4
 
 /* ------------------------------- Macros ------------------------------------*/
+/* 使用指定的析构函数释放指定实体的值 */
 #define dictFreeVal(d, entry) \
     if ((d)->type->valDestructor) \
         (d)->type->valDestructor((d)->privdata, (entry)->v.val)
 
+/* 使用指定的值复制函数，给指定实体设置给定的值，否则用给定值直接赋值。 */
 #define dictSetVal(d, entry, _val_) do { \
     if ((d)->type->valDup) \
         (entry)->v.val = (d)->type->valDup((d)->privdata, _val_); \
@@ -120,19 +122,24 @@ typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
         (entry)->v.val = (_val_); \
 } while(0)
 
+/* 给实体设置有符号整数 */
 #define dictSetSignedIntegerVal(entry, _val_) \
     do { (entry)->v.s64 = _val_; } while(0)
 
+/* 给实体设置无符号整数 */
 #define dictSetUnsignedIntegerVal(entry, _val_) \
     do { (entry)->v.u64 = _val_; } while(0)
 
+/* 给实体设置有浮点数 */
 #define dictSetDoubleVal(entry, _val_) \
     do { (entry)->v.d = _val_; } while(0)
 
+/* 使用指定的键析构函数释放实体的键 */
 #define dictFreeKey(d, entry) \
     if ((d)->type->keyDestructor) \
         (d)->type->keyDestructor((d)->privdata, (entry)->key)
 
+/* 使用字典的键复制函数，给指定实体的键赋值，否则直接赋值 */
 #define dictSetKey(d, entry, _key_) do { \
     if ((d)->type->keyDup) \
         (entry)->key = (d)->type->keyDup((d)->privdata, _key_); \
@@ -140,19 +147,20 @@ typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
         (entry)->key = (_key_); \
 } while(0)
 
+/* 使用字典的键比较函数，比较两个键值，否则直接进行对比 */
 #define dictCompareKeys(d, key1, key2) \
     (((d)->type->keyCompare) ? \
         (d)->type->keyCompare((d)->privdata, key1, key2) : \
         (key1) == (key2))
 
 #define dictHashKey(d, key) (d)->type->hashFunction(key) /* 使用哈希函数，获取指定键对应的哈希值 */
-#define dictGetKey(he) ((he)->key)
-#define dictGetVal(he) ((he)->v.val)
-#define dictGetSignedIntegerVal(he) ((he)->v.s64)
-#define dictGetUnsignedIntegerVal(he) ((he)->v.u64)
-#define dictGetDoubleVal(he) ((he)->v.d)
-#define dictSlots(d) ((d)->ht[0].size+(d)->ht[1].size)
-#define dictSize(d) ((d)->ht[0].used+(d)->ht[1].used)
+#define dictGetKey(he) ((he)->key) /* 获取一个哈希实体的键 */
+#define dictGetVal(he) ((he)->v.val) /* 获取一个哈希实体的值 */
+#define dictGetSignedIntegerVal(he) ((he)->v.s64) /* 获取哈希实体的有符号的整数值 */
+#define dictGetUnsignedIntegerVal(he) ((he)->v.u64) /* 获取哈希实体的无符号整数值 */
+#define dictGetDoubleVal(he) ((he)->v.d) /* 获取哈希实体的浮点数值 */
+#define dictSlots(d) ((d)->ht[0].size+(d)->ht[1].size) /* 获取整个字典的存储大小 */
+#define dictSize(d) ((d)->ht[0].used+(d)->ht[1].used) /* 获取整个字典已使用的存储大小 */
 #define dictIsRehashing(d) ((d)->rehashidx != -1) /* 判断字典是不是在rehash过程中 */
 
 /* API */

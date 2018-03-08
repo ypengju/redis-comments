@@ -146,26 +146,31 @@ int dictResize(dict *d)
     return dictExpand(d, minimal);
 }
 
+/* 扩容或者创建一个指定大小的哈希表 */
 /* Expand or create the hash table */
 int dictExpand(dict *d, unsigned long size)
 {
     dictht n; /* the new hash table */
-    unsigned long realsize = _dictNextPower(size);
+    unsigned long realsize = _dictNextPower(size); /* 调整真实的大小为2^N */
 
+    /* 如果当前字典正在rehash，或者扩充的大小比当前使用的大小还小，则扩容失败 */
     /* the size is invalid if it is smaller than the number of
      * elements already inside the hash table */
     if (dictIsRehashing(d) || d->ht[0].used > size)
         return DICT_ERR;
 
+    /* 如果扩容后的大小和现在的一样大，扩容是失败，因为没必要 */
     /* Rehashing to the same table size is not useful. */
     if (realsize == d->ht[0].size) return DICT_ERR;
 
+    /* 扩容，申请扩容大小的内存空间 */
     /* Allocate the new hash table and initialize all pointers to NULL */
     n.size = realsize;
     n.sizemask = realsize-1;
     n.table = zcalloc(realsize*sizeof(dictEntry*));
     n.used = 0;
 
+    /* 如果字典的第一个哈希表空的数组，说明这并不是扩容，而是初始化，所以将创建的哈希表给该数组，然后返回 */
     /* Is this the first initialization? If so it's not really a rehashing
      * we just set the first hash table so that it can accept keys. */
     if (d->ht[0].table == NULL) {
@@ -173,6 +178,7 @@ int dictExpand(dict *d, unsigned long size)
         return DICT_OK;
     }
 
+    /* 将新申请的哈希表给ht[1]，然后修改字典的rehashidx，开始rehash */
     /* Prepare a second hash table for incremental rehashing */
     d->ht[1] = n;
     d->rehashidx = 0;
@@ -305,6 +311,7 @@ dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
     dictEntry *entry;
     dictht *ht;
 
+    /* 判断当前是否正在rehash */
     if (dictIsRehashing(d)) _dictRehashStep(d);
 
     /* 获取新元素的下标，如果元素已经存在，返回-1 */
@@ -924,15 +931,23 @@ unsigned long dictScan(dict *d,
 
 /* ------------------------- private functions ------------------------------ */
 
+/* 判断字典是否需要扩容 */
 /* Expand the hash table if needed */
 static int _dictExpandIfNeeded(dict *d)
 {
+    /* 如果扩容的rehash正在执行, 则不需要处理 */
     /* Incremental rehashing already in progress. Return. */
     if (dictIsRehashing(d)) return DICT_OK;
 
+    /* 如果用于存储的哈希表存储大小为0， 则将为其分配初始的大小空间 */
     /* If the hash table is empty expand it to the initial size. */
     if (d->ht[0].size == 0) return dictExpand(d, DICT_HT_INITIAL_SIZE);
 
+    /* 如果当前的存储的键值对数量 大于等于 哈希表的大小，则需要尝试着去扩容
+     * 当键值对超过哈希大小是，存储新的键值对就会采用链表的形式存储在对于的hash下标
+     * 当dict_can_resize为1时，或者使用的大小是hash大小的5倍时，就对哈希表进行扩容
+     * 扩容的大小为当前使用大小的两倍
+     */
     /* If we reached the 1:1 ratio, and we are allowed to resize the hash
      * table (global setting) or we should avoid it but the ratio between
      * elements/buckets is over the "safe" threshold, we resize doubling
@@ -946,6 +961,7 @@ static int _dictExpandIfNeeded(dict *d)
     return DICT_OK;
 }
 
+/* 哈希表的大小都需要为2^N，所以找到大于等于size的第一个2^N的值 */
 /* Our hash table capability is a power of two */
 static unsigned long _dictNextPower(unsigned long size)
 {
@@ -959,6 +975,7 @@ static unsigned long _dictNextPower(unsigned long size)
     }
 }
 
+/* */
 /* Returns the index of a free slot that can be populated with
  * a hash entry for the given 'key'.
  * If the key already exists, -1 is returned
