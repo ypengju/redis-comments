@@ -59,7 +59,7 @@
  * Note that even when dict_can_resize is set to 0, not all resizes are
  * prevented: a hash table is still allowed to grow if the ratio between
  * the number of elements and the buckets > dict_force_resize_ratio. */
-static int dict_can_resize = 1; /* 标记字典是否可重置大小 */
+static int dict_can_resize = 1; /* 标记字典是否可收缩 */
 static unsigned int dict_force_resize_ratio = 5; /* 达到这个概率时，可强制进行resize */
 
 /* -------------------------- private prototypes ---------------------------- */
@@ -133,20 +133,22 @@ int _dictInit(dict *d, dictType *type,
     return DICT_OK;
 }
 
+/* 重置字典的大小，字典收缩 */
 /* Resize the table to the minimal size that contains all the elements,
  * but with the invariant of a USED/BUCKETS ratio near to <= 1 */
 int dictResize(dict *d)
 {
     int minimal;
 
+    /* 如果不能收缩，或者是在rehash的过程中，则不操作 */
     if (!dict_can_resize || dictIsRehashing(d)) return DICT_ERR;
-    minimal = d->ht[0].used;
-    if (minimal < DICT_HT_INITIAL_SIZE)
+    minimal = d->ht[0].used; /* 判断当前字典真实的使用大小 */
+    if (minimal < DICT_HT_INITIAL_SIZE) /* 如果小于最小大小，则按最小大小 */
         minimal = DICT_HT_INITIAL_SIZE;
-    return dictExpand(d, minimal);
+    return dictExpand(d, minimal); /* 开始收缩 */
 }
 
-/* 扩容或者创建一个指定大小的哈希表 */
+/* 扩容或收缩字典，创建指定的大小的新的哈希表给ht[1],然后开始rehash */
 /* Expand or create the hash table */
 int dictExpand(dict *d, unsigned long size)
 {
@@ -272,7 +274,7 @@ static void _dictRehashStep(dict *d) {
     if (d->iterators == 0) dictRehash(d,1);
 }
 
-/* 往指定字典添加元素 */
+/* 往指定字典添加键值对，如果添加成功，返回键值对实体，然后再设置值*/
 /* Add an element to the target hash table */
 int dictAdd(dict *d, void *key, void *val)
 {
@@ -320,6 +322,11 @@ dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
     if ((index = _dictKeyIndex(d, key, dictHashKey(d,key), existing)) == -1)
         return NULL;
 
+    /* 申请内存，存储监键值对
+     * 如果当前在rehash过程中，则新的键值对直接存储在ht[1]中，否则存储在ht[0]中
+     * 将新的键值对实体存储在获取的下标链表的表头，因为在数据库中，最近访问的经常是更频繁
+     * 访问的。
+     */
     /* Allocate the memory and store the new entry.
      * Insert the element in top, with the assumption that in a database
      * system it is more likely that recently added entries are accessed
@@ -330,11 +337,13 @@ dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing)
     ht->table[index] = entry;
     ht->used++;
 
+    /* 设置该实体的键 */
     /* Set the hash entry fields. */
     dictSetKey(d, entry, key);
     return entry;
 }
 
+/* 添加新的键值对实体，如果存在则覆盖掉，就像更新指定键的值 */
 /* Add or Overwrite:
  * Add an element, discarding the old value if the key already exists.
  * Return 1 if the key was added from scratch, 0 if there was already an
@@ -344,6 +353,7 @@ int dictReplace(dict *d, void *key, void *val)
 {
     dictEntry *entry, *existing, auxentry;
 
+    /* 尝试的添加键值对实体，添加成功是，返回该实体，然后设置实体值域 */
     /* Try to add the element. If the key
      * does not exists dictAdd will suceed. */
     entry = dictAddRaw(d,key,&existing);
@@ -352,6 +362,7 @@ int dictReplace(dict *d, void *key, void *val)
         return 1;
     }
 
+    /* entry 时空，说明指定键已经存在，则获取该实体，设置新的值，释放旧的值*/
     /* Set the new value and free the old one. Note that it is important
      * to do that in this order, as the value may just be exactly the same
      * as the previous one. In this context, think to reference counting,
@@ -363,6 +374,7 @@ int dictReplace(dict *d, void *key, void *val)
     return 0;
 }
 
+/* 添加指定键的实体，如果添加成功，返回新的实体，否则返回旧的实体 */
 /* Add or Find:
  * dictAddOrFind() is simply a version of dictAddRaw() that always
  * returns the hash entry of the specified key, even if the key already
@@ -376,6 +388,7 @@ dictEntry *dictAddOrFind(dict *d, void *key) {
     return entry ? entry : existing;
 }
 
+/* 删除一个键值对，是dictDelete和dictUnlink的辅助函数 */
 /* Search and remove an element. This is an helper function for
  * dictDelete() and dictUnlink(), please check the top comment
  * of those functions. */
@@ -384,11 +397,15 @@ static dictEntry *dictGenericDelete(dict *d, const void *key, int nofree) {
     dictEntry *he, *prevHe;
     int table;
 
+    /* 没有键值对，直接返回不错作 */
     if (d->ht[0].used == 0 && d->ht[1].used == 0) return NULL;
 
     if (dictIsRehashing(d)) _dictRehashStep(d);
-    h = dictHashKey(d, key);
+    h = dictHashKey(d, key); /* 获取指定键的哈希值 */
 
+    /* 判断两个ht表，如果不在rehash过程中只判断ht[0],否则ht[1]也要判断
+     * 找指定的键的实体，找到村链表中删除，如果标记释放，则要释放键值，返该实体，没找到返回空
+     */
     for (table = 0; table <= 1; table++) {
         idx = h & d->ht[table].sizemask;
         he = d->ht[table].table[idx];
@@ -416,12 +433,14 @@ static dictEntry *dictGenericDelete(dict *d, const void *key, int nofree) {
     return NULL; /* not found */
 }
 
+/* 删除指定的键值对，并释放键值对内存 */
 /* Remove an element, returning DICT_OK on success or DICT_ERR if the
  * element was not found. */
 int dictDelete(dict *ht, const void *key) {
     return dictGenericDelete(ht,key,0) ? DICT_OK : DICT_ERR;
 }
 
+/* 删除指定的键值对，但不释放键值，返回该实体 */
 /* Remove an element from the table, but without actually releasing
  * the key, value and dictionary entry. The dictionary entry is returned
  * if the element was found (and unlinked from the table), and the user
@@ -447,6 +466,7 @@ dictEntry *dictUnlink(dict *ht, const void *key) {
     return dictGenericDelete(ht,key,1);
 }
 
+/* 释放指定实体的键值，用于 dictUnlink 的返回操作 */
 /* You need to call this function to really free the entry after a call
  * to dictUnlink(). It's safe to call this function with 'he' = NULL. */
 void dictFreeUnlinkedEntry(dict *d, dictEntry *he) {
@@ -456,10 +476,12 @@ void dictFreeUnlinkedEntry(dict *d, dictEntry *he) {
     zfree(he);
 }
 
+/* 释放哈希表 */
 /* Destroy an entire dictionary */
 int _dictClear(dict *d, dictht *ht, void(callback)(void *)) {
     unsigned long i;
 
+    /* 释放所有的键值对 */
     /* Free all the elements */
     for (i = 0; i < ht->size && ht->used > 0; i++) {
         dictEntry *he, *nextHe;
@@ -476,13 +498,15 @@ int _dictClear(dict *d, dictht *ht, void(callback)(void *)) {
             he = nextHe;
         }
     }
+    /* 释放数组 */
     /* Free the table and the allocated cache structure */
     zfree(ht->table);
     /* Re-initialize the table */
-    _dictReset(ht);
+    _dictReset(ht); /* 重置哈希表 */
     return DICT_OK; /* never fails */
 }
 
+/* 清空并释放字典 */
 /* Clear & Release the hash table */
 void dictRelease(dict *d)
 {
@@ -491,6 +515,7 @@ void dictRelease(dict *d)
     zfree(d);
 }
 
+/* 找到指定键的实体，否则返回NULL */
 dictEntry *dictFind(dict *d, const void *key)
 {
     dictEntry *he;
@@ -512,13 +537,15 @@ dictEntry *dictFind(dict *d, const void *key)
     return NULL;
 }
 
+/* 获取指定键的值 */
 void *dictFetchValue(dict *d, const void *key) {
     dictEntry *he;
 
-    he = dictFind(d,key);
+    he = dictFind(d,key); /* 先获取实体，在获取实体中保存的值 */
     return he ? dictGetVal(he) : NULL;
 }
 
+/* 字典的指纹？ */
 /* A fingerprint is a 64 bit number that represents the state of the dictionary
  * at a given time, it's just a few dict properties xored together.
  * When an unsafe iterator is initialized, we get the dict fingerprint, and check
@@ -989,23 +1016,26 @@ static long _dictKeyIndex(dict *d, const void *key, uint64_t hash, dictEntry **e
     dictEntry *he;
     if (existing) *existing = NULL;
 
+    /* 判断字典是否需要扩容 */
     /* Expand the hash table if needed */
     if (_dictExpandIfNeeded(d) == DICT_ERR)
         return -1;
     for (table = 0; table <= 1; table++) {
-        idx = hash & d->ht[table].sizemask;
+        idx = hash & d->ht[table].sizemask; /* 用hash算出存储瞎下标 */
+        /* 判断是否已经存在了key*/
         /* Search if this slot does not already contain the given key */
         he = d->ht[table].table[idx];
         while(he) {
+            /* 判断key是否已经存在，如果存在，使existing指向该实体 */
             if (key==he->key || dictCompareKeys(d, key, he->key)) {
                 if (existing) *existing = he;
-                return -1;
+                return -1; /* 存在返回-1 */
             }
             he = he->next;
         }
-        if (!dictIsRehashing(d)) break;
+        if (!dictIsRehashing(d)) break; /* 如果是在rehash过程中，需要ht[1]，否则只判断ht[0] */
     }
-    return idx;
+    return idx; /* 不存在返回算出的idx */
 }
 
 void dictEmpty(dict *d, void(callback)(void*)) {
@@ -1015,18 +1045,22 @@ void dictEmpty(dict *d, void(callback)(void*)) {
     d->iterators = 0;
 }
 
+/* 是字典可以收缩 */
 void dictEnableResize(void) {
     dict_can_resize = 1;
 }
 
+/* 使字典不可收缩 */
 void dictDisableResize(void) {
     dict_can_resize = 0;
 }
 
+/* 获取给定键的哈希值 */
 uint64_t dictGetHash(dict *d, const void *key) {
     return dictHashKey(d, key);
 }
 
+/* 获取指定键实体的指针 */
 /* Finds the dictEntry reference by using pointer and pre-calculated hash.
  * oldkey is a dead pointer and should not be accessed.
  * the hash value should be provided using dictGetHash.
