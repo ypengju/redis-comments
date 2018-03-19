@@ -187,7 +187,8 @@ int dictExpand(dict *d, unsigned long size)
     return DICT_OK;
 }
 
-/* 向前执行N步rehash，
+/* 向前执行N步rehash，如果还没没有rehash完毕，则返回1，否则返回0
+ * 
  */
 /* Performs N steps of incremental rehashing. Returns 1 if there are still
  * keys to move from the old to the new hash table, otherwise 0 is returned.
@@ -213,6 +214,8 @@ int dictRehash(dict *d, int n) {
             if (--empty_visits == 0) return 1;
         }
         de = d->ht[0].table[d->rehashidx];
+
+        /* 将ht[0]数组中下标的链表移动到ht[1]中 */
         /* Move all the keys in this bucket from the old to the new hash HT */
         while(de) {
             uint64_t h;
@@ -230,6 +233,9 @@ int dictRehash(dict *d, int n) {
         d->rehashidx++;
     }
 
+    /* 检查是否还有没有rehash的，如果没有了，将新的哈希表ht[1]变为ht[0]
+     * 释放就的ht[0],然后重置ht[1], 将rehashidx标记为-1，返回0表示rehash完成。
+     */
     /* Check if we already rehashed the whole table... */
     if (d->ht[0].used == 0) {
         zfree(d->ht[0].table);
@@ -243,6 +249,7 @@ int dictRehash(dict *d, int n) {
     return 1;
 }
 
+/* 获取毫秒级别的时间戳 */
 long long timeInMilliseconds(void) {
     struct timeval tv;
 
@@ -250,6 +257,7 @@ long long timeInMilliseconds(void) {
     return (((long long)tv.tv_sec)*1000)+(tv.tv_usec/1000);
 }
 
+/* 在指定时间内进行rehash */
 /* Rehash for an amount of time between ms milliseconds and ms+1 milliseconds */
 int dictRehashMilliseconds(dict *d, int ms) {
     long long start = timeInMilliseconds();
