@@ -66,6 +66,7 @@
 int zslLexValueGteMin(sds value, zlexrangespec *spec);
 int zslLexValueLteMax(sds value, zlexrangespec *spec);
 
+/* 创建一个跳跃表的节点，使用指定的层数 同时指定分值和sds*/
 /* Create a skiplist node with the specified number of levels.
  * The SDS string 'ele' is referenced by the node after the call. */
 zskiplistNode *zslCreateNode(int level, double score, sds ele) {
@@ -76,11 +77,12 @@ zskiplistNode *zslCreateNode(int level, double score, sds ele) {
     return zn;
 }
 
+/* 创建一个跳跃表 */
 /* Create a new skiplist. */
 zskiplist *zslCreate(void) {
     int j;
     zskiplist *zsl;
-
+    /* 创建zskiplist结构，创建表头，表头的层为32层 */
     zsl = zmalloc(sizeof(*zsl));
     zsl->level = 1;
     zsl->length = 0;
@@ -94,6 +96,7 @@ zskiplist *zslCreate(void) {
     return zsl;
 }
 
+/* 释放跳跃表的指定节点 */
 /* Free the specified skiplist node. The referenced SDS string representation
  * of the element is freed too, unless node->ele is set to NULL before calling
  * this function. */
@@ -102,6 +105,7 @@ void zslFreeNode(zskiplistNode *node) {
     zfree(node);
 }
 
+/* 释放整个跳跃表 */
 /* Free a whole skiplist. */
 void zslFree(zskiplist *zsl) {
     zskiplistNode *node = zsl->header->level[0].forward, *next;
@@ -115,6 +119,10 @@ void zslFree(zskiplist *zsl) {
     zfree(zsl);
 }
 
+/* 返回一个随机值，用作新跳跃表节点的层数。
+ * 返回的值介于 1 - 32之间，包括这两个值本身
+ * 根据随机算法所使用的幂次定律，越大的值生成的几率越小。
+*/
 /* Returns a random level for the new skiplist node we are going to create.
  * The return value of this function is between 1 and ZSKIPLIST_MAXLEVEL
  * (both inclusive), with a powerlaw-alike distribution where higher
@@ -126,6 +134,7 @@ int zslRandomLevel(void) {
     return (level<ZSKIPLIST_MAXLEVEL) ? level : ZSKIPLIST_MAXLEVEL;
 }
 
+/*  */
 /* Insert a new node in the skiplist. Assumes the element does not already
  * exist (up to the caller to enforce that). The skiplist takes ownership
  * of the passed SDS string 'ele'. */
@@ -186,6 +195,7 @@ zskiplistNode *zslInsert(zskiplist *zsl, double score, sds ele) {
     return x;
 }
 
+/* 内部的辅助函数 供zslDelete， zslDeleteByScore， zslDeleteByRank调用 */
 /* Internal function used by zslDelete, zslDeleteByScore and zslDeleteByRank */
 void zslDeleteNode(zskiplist *zsl, zskiplistNode *x, zskiplistNode **update) {
     int i;
