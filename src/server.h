@@ -1556,16 +1556,18 @@ void receiveChildInfo(void);
 /* Flags only used by the ZADD command but not by zsetAdd() API: */
 #define ZADD_CH (1<<16)      /* Return num of elements added or updated. */
 
+/* 保存数值最小值和最大值的一个结构 */
 /* Struct to hold a inclusive/exclusive range spec by score comparison. */
 typedef struct {
     double min, max;
-    int minex, maxex; /* are min or max exclusive? */
+    int minex, maxex; /* are min or max exclusive? */ /* 标记是否不包括最大最小值 */
 } zrangespec;
 
+/* 保存sds最小值和最大值的一个结构 */
 /* Struct to hold an inclusive/exclusive range spec by lexicographic comparison. */
 typedef struct {
     sds min, max;     /* May be set to shared.(minstring|maxstring) */
-    int minex, maxex; /* are min or max exclusive? */
+    int minex, maxex; /* are min or max exclusive? */ /* 标记是否不包括最大最小值 */
 } zlexrangespec;
 
 zskiplist *zslCreate(void);
