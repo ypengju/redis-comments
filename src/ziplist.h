@@ -31,8 +31,8 @@
 #ifndef _ZIPLIST_H
 #define _ZIPLIST_H
 
-#define ZIPLIST_HEAD 0
-#define ZIPLIST_TAIL 1
+#define ZIPLIST_HEAD 0 /* 列表头 */
+#define ZIPLIST_TAIL 1 /* 列表尾 */
 
 unsigned char *ziplistNew(void);
 unsigned char *ziplistMerge(unsigned char **first, unsigned char **second);
