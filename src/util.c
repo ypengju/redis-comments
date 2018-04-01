@@ -328,6 +328,7 @@ int ll2string(char *dst, size_t dstlen, long long svalue) {
     return length;
 }
 
+/* 将一字符串转换层long long类型 如果成功转换返回1，否则返回0*/
 /* Convert a string into a long long. Returns 1 if the string could be parsed
  * into a (non-overflowing) long long, 0 otherwise. The value will be set to
  * the parsed value when appropriate.
@@ -343,30 +344,35 @@ int ll2string(char *dst, size_t dstlen, long long svalue) {
 int string2ll(const char *s, size_t slen, long long *value) {
     const char *p = s;
     size_t plen = 0;
-    int negative = 0;
+    int negative = 0; /* 标记是否是负数 */
     unsigned long long v;
 
+    /* 没长度，那肯定不是 */
     if (plen == slen)
         return 0;
 
+    /* 如果只有一个字符，且是0 那就转换成0返回 */
     /* Special case: first and only digit is 0. */
     if (slen == 1 && p[0] == '0') {
         if (value != NULL) *value = 0;
         return 1;
     }
 
+    /* 第一个字符是-，表明是负数 */
     if (p[0] == '-') {
         negative = 1;
         p++; plen++;
 
+        /* 如果只有一个"-", 那就直接返回 */
         /* Abort on only a negative sign. */
         if (plen == slen)
             return 0;
     }
 
+    /* 第一个字符必须是 1-9 的数字，或者是0且长度为1表示的0，否则就不能转换，直接返回 */
     /* First digit should be 1-9, otherwise the string should just be 0. */
     if (p[0] >= '1' && p[0] <= '9') {
-        v = p[0]-'0';
+        v = p[0]-'0'; /* 字符数字减字符0 就是所代表的数字了 */
         p++; plen++;
     } else if (p[0] == '0' && slen == 1) {
         *value = 0;
@@ -375,8 +381,9 @@ int string2ll(const char *s, size_t slen, long long *value) {
         return 0;
     }
 
+    /* 遍历剩下的所以字符，且每个字符都是0-9的数字字符 */
     while (plen < slen && p[0] >= '0' && p[0] <= '9') {
-        if (v > (ULLONG_MAX / 10)) /* Overflow. */
+        if (v > (ULLONG_MAX / 10)) /* Overflow. */ /* 检查是否溢出 */
             return 0;
         v *= 10;
 
@@ -387,10 +394,12 @@ int string2ll(const char *s, size_t slen, long long *value) {
         p++; plen++;
     }
 
+    /* 如果遍历过程中中间有其他非数字字符，则plen<slen 转换失败 直接返回 */
     /* Return if not all bytes were used. */
     if (plen < slen)
         return 0;
 
+    /* 如果是负数，加符号，正数就直接返回了 */
     if (negative) {
         if (v > ((unsigned long long)(-(LLONG_MIN+1))+1)) /* Overflow. */
             return 0;
