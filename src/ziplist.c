@@ -349,6 +349,7 @@ unsigned int zipIntSize(unsigned char encoding) {
     return 0;
 }
 
+/* 计算存储值的编码长度，并将编码值写入其中 */
 /* Write the encoidng header of the entry in 'p'. If p is NULL it just returns
  * the amount of bytes required to encode such a length. Arguments:
  *
@@ -363,19 +364,22 @@ unsigned int zipIntSize(unsigned char encoding) {
  * header stored in 'p'. */
 unsigned int zipStoreEntryEncoding(unsigned char *p, unsigned char encoding, unsigned int rawlen) {
     unsigned char len = 1, buf[5];
-
+    /* 根据编码判断是字符串还是整数 */
     if (ZIP_IS_STR(encoding)) {
+        /* 长度小于2^6的，长度编码直接可存储在 1个字节中*/
         /* Although encoding is given it may not be set for strings,
          * so we determine it here using the raw length. */
         if (rawlen <= 0x3f) {
             if (!p) return len;
             buf[0] = ZIP_STR_06B | rawlen;
         } else if (rawlen <= 0x3fff) {
+            /* 2^14内的，两个字节就可以 */
             len += 1;
             if (!p) return len;
             buf[0] = ZIP_STR_14B | ((rawlen >> 8) & 0x3f);
             buf[1] = rawlen & 0xff;
         } else {
+            /* 2^32内的，要5个字节存储长度，第一个存储编码，后四个存储长度 */
             len += 4;
             if (!p) return len;
             buf[0] = ZIP_STR_32B;
@@ -385,6 +389,7 @@ unsigned int zipStoreEntryEncoding(unsigned char *p, unsigned char encoding, uns
             buf[4] = rawlen & 0xff;
         }
     } else {
+        /* 整数的编码长度总是1 */
         /* Implies integer encoding, so length is always 1. */
         if (!p) return len;
         buf[0] = encoding;
@@ -437,6 +442,7 @@ unsigned int zipStoreEntryEncoding(unsigned char *p, unsigned char encoding, uns
     }                                                                          \
 } while(0);
 
+/* 要编码的前一个节点长度大于等于254，那第1个字节存储254，剩下的四个字节存储长度 */
 /* Encode the length of the previous entry and write it to "p". This only
  * uses the larger encoding (required in __ziplistCascadeUpdate). */
 int zipStorePrevEntryLengthLarge(unsigned char *p, unsigned int len) {
@@ -448,6 +454,11 @@ int zipStorePrevEntryLengthLarge(unsigned char *p, unsigned int len) {
     return 1+sizeof(len);
 }
 
+/* 获取编码前一个节点实体需要的长度 
+ * 如果p是null，长度小于254，则需要1个字节，大于等于254 则需要5个字节
+ * 如果p不是null，长度小于254，那就需要1个字节，并将长度存储在p的第一个字节
+ * 长度大于等于254， 则需要5个字节，第一个字节存储254，剩下4个字节存储长度
+*/
 /* Encode the length of the previous entry and write it to "p". Return the
  * number of bytes needed to encode this length if "p" is NULL. */
 unsigned int zipStorePrevEntryLength(unsigned char *p, unsigned int len) {
@@ -498,6 +509,7 @@ unsigned int zipStorePrevEntryLength(unsigned char *p, unsigned int len) {
     }                                                                          \
 } while(0);
 
+/* p节点的前一个节点的 编码长度 与指定长度节点的编码长度的差值 */
 /* Given a pointer 'p' to the prevlen info that prefixes an entry, this
  * function returns the difference in number of bytes needed to encode
  * the prevlen if the previous entry changes of size.
@@ -533,16 +545,20 @@ unsigned int zipRawEntryLength(unsigned char *p) {
     return prevlensize + lensize + len;
 }
 
-/* 查看给定的值entry是否能转换成整数 */
+/* 查看给定的值entry是否能转换成整数 如果能转换成功 返回1 否则返回0
+ * 成功时 参数v中存储值，encoding中存储值的编码
+*/
 /* Check if string pointed to by 'entry' can be encoded as an integer.
  * Stores the integer value in 'v' and its encoding in 'encoding'. */
 int zipTryEncoding(unsigned char *entry, unsigned int entrylen, long long *v, unsigned char *encoding) {
     long long value;
     /* 如果长度大于32或者长度是0 那肯定不是整数了 */
     if (entrylen >= 32 || entrylen == 0) return 0;
+    /* 检查entry是否能转换成long long */
     if (string2ll((char*)entry,entrylen,&value)) {
         /* Great, the string can be encoded. Check what's the smallest
          * of our encoding types that can hold this value. */
+        /* 值在0-12区间时，是直接存储在编码中的 */
         if (value >= 0 && value <= 12) {
             *encoding = ZIP_INT_IMM_MIN+value;
         } else if (value >= INT8_MIN && value <= INT8_MAX) {
@@ -827,6 +843,9 @@ unsigned char *__ziplistInsert(unsigned char *zl, unsigned char *p, unsigned cha
         }
     }
 
+    /* 查看值是否能转换成整数，如果能则需要存储的字节数通过编码获取，否则就是字符串了，
+     * 则需要的存储长度是字符串的长度。
+     */
     /* See if the entry can be encoded */
     if (zipTryEncoding(s,slen,&value,&encoding)) {
         /* 'encoding' is set to the appropriate integer encoding */
@@ -836,11 +855,13 @@ unsigned char *__ziplistInsert(unsigned char *zl, unsigned char *p, unsigned cha
          * string length to figure out how to encode it. */
         reqlen = slen;
     }
+
     /* We need space for both the length of the previous entry and
      * the length of the payload. */
-    reqlen += zipStorePrevEntryLength(NULL,prevlen);
-    reqlen += zipStoreEntryEncoding(NULL,encoding,slen);
+    reqlen += zipStorePrevEntryLength(NULL,prevlen); /* 计算编码前一个节点长度，需要的字节数 1或5字节 */
+    reqlen += zipStoreEntryEncoding(NULL,encoding,slen); /* 计算存储值的长度需要的编码长度 */
 
+    /* 如果插入新节点的位置不是最后一个节点 */
     /* When the insert position is not equal to the tail, we need to
      * make sure that the next entry can hold this entry's length in
      * its prevlen field. */
@@ -900,7 +921,7 @@ unsigned char *__ziplistInsert(unsigned char *zl, unsigned char *p, unsigned cha
     } else {
         zipSaveInteger(p,value,encoding);
     }
-    ZIPLIST_INCR_LENGTH(zl,1);
+    ZIPLIST_INCR_LENGTH(zl,1); /* 列表的节点数+1 */
     return zl;
 }
 
