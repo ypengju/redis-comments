@@ -38,12 +38,13 @@
 
 /* ===================== Creation and parsing of objects ==================== */
 
+/* 创建对象 */
 robj *createObject(int type, void *ptr) {
     robj *o = zmalloc(sizeof(*o));
-    o->type = type;
-    o->encoding = OBJ_ENCODING_RAW;
+    o->type = type; /* 指定的类型 */
+    o->encoding = OBJ_ENCODING_RAW; /* 初始编码 */
     o->ptr = ptr;
-    o->refcount = 1;
+    o->refcount = 1; /* 初始引用计数为1 */
 
     /* Set the LRU to the current lruclock (minutes resolution), or
      * alternatively the LFU counter. */
@@ -66,18 +67,21 @@ robj *createObject(int type, void *ptr) {
  * robj *myobject = makeObjectShared(createObject(...));
  *
  */
+/* 讲对象设置为共享的，该对象必须没其他引用 */
 robj *makeObjectShared(robj *o) {
     serverAssert(o->refcount == 1);
     o->refcount = OBJ_SHARED_REFCOUNT;
     return o;
 }
 
+/* 创建一个原生编码的字符串对象 */
 /* Create a string object with encoding OBJ_ENCODING_RAW, that is a plain
  * string object where o->ptr points to a proper sds string. */
 robj *createRawStringObject(const char *ptr, size_t len) {
     return createObject(OBJ_STRING, sdsnewlen(ptr,len));
 }
 
+/* 创建一个embed字符串对象，该对象底层是用sdshdr8结构来保存的 */
 /* Create a string object with encoding OBJ_ENCODING_EMBSTR, that is
  * an object where the sds string is actually an unmodifiable string
  * allocated in the same chunk as the object itself. */
@@ -114,6 +118,7 @@ robj *createEmbeddedStringObject(const char *ptr, size_t len) {
  * The current limit of 39 is chosen so that the biggest string object
  * we allocate as EMBSTR will still fit into the 64 byte arena of jemalloc. */
 #define OBJ_ENCODING_EMBSTR_SIZE_LIMIT 44
+/* 创建字符串对象，根据字符串长度，选择创建raw还是embed, embed的限制大小是44 */
 robj *createStringObject(const char *ptr, size_t len) {
     if (len <= OBJ_ENCODING_EMBSTR_SIZE_LIMIT)
         return createEmbeddedStringObject(ptr,len);
@@ -121,12 +126,15 @@ robj *createStringObject(const char *ptr, size_t len) {
         return createRawStringObject(ptr,len);
 }
 
+/* 用long long整数创建一个字符串对象 */
 robj *createStringObjectFromLongLong(long long value) {
     robj *o;
+    /* [0 ~ 1000) 是共享的整数段，所以如果是在该区间的，只要增加引用计数就好了 */
     if (value >= 0 && value < OBJ_SHARED_INTEGERS) {
         incrRefCount(shared.integers[value]);
         o = shared.integers[value];
     } else {
+        /* 是长整数区间的，直接创建字符串对象，将value转换为指针 否则转换成字符串，然后创建 */
         if (value >= LONG_MIN && value <= LONG_MAX) {
             o = createObject(OBJ_STRING, NULL);
             o->encoding = OBJ_ENCODING_INT;
@@ -138,6 +146,7 @@ robj *createStringObjectFromLongLong(long long value) {
     return o;
 }
 
+/* 使用 long double创建一个字符串对象， */
 /* Create a string object from a long double. If humanfriendly is non-zero
  * it does not use exponential format and trims trailing zeroes at the end,
  * however this results in loss of precision. Otherwise exp format is used
@@ -150,6 +159,7 @@ robj *createStringObjectFromLongDouble(long double value, int humanfriendly) {
     return createStringObject(buf,len);
 }
 
+/* 复制一个字符串对象，复制后的对象引用计数为1 */
 /* Duplicate a string object, with the guarantee that the returned object
  * has the same encoding as the original one.
  *
@@ -179,6 +189,7 @@ robj *dupStringObject(const robj *o) {
     }
 }
 
+/* 创建一个快速列表对象 */
 robj *createQuicklistObject(void) {
     quicklist *l = quicklistCreate();
     robj *o = createObject(OBJ_LIST,l);
@@ -186,6 +197,7 @@ robj *createQuicklistObject(void) {
     return o;
 }
 
+/* 创建一个压缩列表对象 */
 robj *createZiplistObject(void) {
     unsigned char *zl = ziplistNew();
     robj *o = createObject(OBJ_LIST,zl);
@@ -193,6 +205,7 @@ robj *createZiplistObject(void) {
     return o;
 }
 
+/* 创建一个集合对象 */
 robj *createSetObject(void) {
     dict *d = dictCreate(&setDictType,NULL);
     robj *o = createObject(OBJ_SET,d);
@@ -200,6 +213,7 @@ robj *createSetObject(void) {
     return o;
 }
 
+/* 创建一个整数集合对象 */
 robj *createIntsetObject(void) {
     intset *is = intsetNew();
     robj *o = createObject(OBJ_SET,is);
@@ -207,6 +221,7 @@ robj *createIntsetObject(void) {
     return o;
 }
 
+/* 创建一个哈希表对象 */
 robj *createHashObject(void) {
     unsigned char *zl = ziplistNew();
     robj *o = createObject(OBJ_HASH, zl);
@@ -214,6 +229,7 @@ robj *createHashObject(void) {
     return o;
 }
 
+/* 创建一个有序集合对象 */
 robj *createZsetObject(void) {
     zset *zs = zmalloc(sizeof(*zs));
     robj *o;
@@ -225,6 +241,7 @@ robj *createZsetObject(void) {
     return o;
 }
 
+/* 创建一个有序集合的压缩列表对象 */
 robj *createZsetZiplistObject(void) {
     unsigned char *zl = ziplistNew();
     robj *o = createObject(OBJ_ZSET,zl);
@@ -232,6 +249,7 @@ robj *createZsetZiplistObject(void) {
     return o;
 }
 
+/* 创建一个模块对象 */
 robj *createModuleObject(moduleType *mt, void *value) {
     moduleValue *mv = zmalloc(sizeof(*mv));
     mv->type = mt;
@@ -303,10 +321,12 @@ void freeModuleObject(robj *o) {
     zfree(mv);
 }
 
+/* 增加非共享对象的引用对象的引用计数 */
 void incrRefCount(robj *o) {
     if (o->refcount != OBJ_SHARED_REFCOUNT) o->refcount++;
 }
 
+/* 减少对象的引用计数，如果引用计数为1时，则释放对象 */
 void decrRefCount(robj *o) {
     if (o->refcount == 1) {
         switch(o->type) {
@@ -332,6 +352,7 @@ void decrRefCountVoid(void *o) {
     decrRefCount(o);
 }
 
+/* 重置对象的引用计数为0，但并不释放该对象。 */
 /* This function set the ref count to zero without freeing the object.
  * It is useful in order to pass a new object to functions incrementing
  * the ref count of the received object. Example:
@@ -349,6 +370,7 @@ robj *resetRefCount(robj *obj) {
     return obj;
 }
 
+/* 检查对象的类型和指定类型是否相同 */
 int checkType(client *c, robj *o, int type) {
     if (o->type != type) {
         addReply(c,shared.wrongtypeerr);
@@ -357,10 +379,12 @@ int checkType(client *c, robj *o, int type) {
     return 0;
 }
 
+/* 是否可以将字符串转换成long long类型 */
 int isSdsRepresentableAsLongLong(sds s, long long *llval) {
     return string2ll(s,sdslen(s),llval) ? C_OK : C_ERR;
 }
 
+/* 对象是否可以转换成long long类型 */
 int isObjectRepresentableAsLongLong(robj *o, long long *llval) {
     serverAssertWithInfo(NULL,o,o->type == OBJ_STRING);
     if (o->encoding == OBJ_ENCODING_INT) {
@@ -680,6 +704,7 @@ int getLongFromObjectOrReply(client *c, robj *o, long *target, const char *msg) 
     return C_OK;
 }
 
+/* 编码对应的字符串 */
 char *strEncoding(int encoding) {
     switch(encoding) {
     case OBJ_ENCODING_RAW: return "raw";

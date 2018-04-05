@@ -447,6 +447,7 @@ typedef long long mstime_t; /* millisecond time type. */
 /* A redis object, that is a type able to hold a string / list / set */
 
 /* The actual Redis Object */
+/* redis对象 字符串，列表，集合，有序集合，哈希表  还有一个特殊的对象，module对象*/
 #define OBJ_STRING 0
 #define OBJ_LIST 1
 #define OBJ_SET 2
@@ -566,6 +567,7 @@ typedef struct RedisModuleDigest {
 /* Objects encoding. Some kind of objects like Strings and Hashes can be
  * internally represented in multiple ways. The 'encoding' field of the object
  * is set to one of this fields for this object. */
+/* redis对象编码，用于表明对象底层具体的算法结构 */
 #define OBJ_ENCODING_RAW 0     /* Raw representation */
 #define OBJ_ENCODING_INT 1     /* Encoded as integer */
 #define OBJ_ENCODING_HT 2      /* Encoded as hash table */
@@ -581,15 +583,17 @@ typedef struct RedisModuleDigest {
 #define LRU_CLOCK_MAX ((1<<LRU_BITS)-1) /* Max value of obj->lru */
 #define LRU_CLOCK_RESOLUTION 1000 /* LRU clock resolution in ms */
 
+/* 最大的int值，表明对象是共享的 */
 #define OBJ_SHARED_REFCOUNT INT_MAX
+/* redis 对象结构 */
 typedef struct redisObject {
-    unsigned type:4;
-    unsigned encoding:4;
+    unsigned type:4; /* type类型 使用位域占4个bit。 */
+    unsigned encoding:4; /* 编码类型 底层的数据结构类型 */
     unsigned lru:LRU_BITS; /* LRU time (relative to global lru_clock) or
                             * LFU data (least significant 8 bits frequency
                             * and most significant 16 bits access time). */
-    int refcount;
-    void *ptr;
+    int refcount; /* 引用计数 */
+    void *ptr; /* 具体的存储结构指针 */
 } robj;
 
 /* Macro used to initialize a Redis object allocated on the stack.
