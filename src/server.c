@@ -124,6 +124,8 @@ volatile unsigned long lru_clock; /* Server global current LRU time. */
  *    Note that commands that may trigger a DEL as a side effect (like SET)
  *    are not fast commands.
  */
+
+/* redis命令列表 */
 struct redisCommand redisCommandTable[] = {
     {"module",moduleCommand,-2,"as",0,NULL,0,0,0,0,0},
     {"get",getCommand,2,"rF",0,NULL,1,1,1,0,0},
@@ -396,6 +398,7 @@ err:
     if (!log_to_stdout) close(fd);
 }
 
+/* 获取unix微妙时间戳 */
 /* Return the UNIX time in microseconds */
 long long ustime(void) {
     struct timeval tv;
@@ -407,6 +410,7 @@ long long ustime(void) {
     return ust;
 }
 
+/* 获取当前的unix毫秒时间戳 */
 /* Return the UNIX time in milliseconds */
 mstime_t mstime(void) {
     return ustime()/1000;
@@ -3576,6 +3580,7 @@ void loadDataFromDisk(void) {
     }
 }
 
+/* redis oom时的处理函数 */
 void redisOutOfMemoryHandler(size_t allocation_size) {
     serverLog(LL_WARNING,"Out Of Memory allocating %zu bytes!",
         allocation_size);
