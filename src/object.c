@@ -370,7 +370,7 @@ robj *resetRefCount(robj *obj) {
     return obj;
 }
 
-/* 检查对象的类型和指定类型是否相同 */
+/* 检查对象的类型和指定类型是否相同，否则响应客户端错误类型 */
 int checkType(client *c, robj *o, int type) {
     if (o->type != type) {
         addReply(c,shared.wrongtypeerr);
@@ -384,7 +384,7 @@ int isSdsRepresentableAsLongLong(sds s, long long *llval) {
     return string2ll(s,sdslen(s),llval) ? C_OK : C_ERR;
 }
 
-/* 对象是否可以转换成long long类型 */
+/* 判断对象是否可以转换成long long类型 */
 int isObjectRepresentableAsLongLong(robj *o, long long *llval) {
     serverAssertWithInfo(NULL,o,o->type == OBJ_STRING);
     if (o->encoding == OBJ_ENCODING_INT) {
@@ -395,6 +395,7 @@ int isObjectRepresentableAsLongLong(robj *o, long long *llval) {
     }
 }
 
+/* 将字符串对象编码以节省空间 */
 /* Try to encode a string object in order to save space */
 robj *tryObjectEncoding(robj *o) {
     long value;
@@ -537,16 +538,19 @@ int compareStringObjectsWithFlags(robj *a, robj *b, int flags) {
     }
 }
 
+/* 使用memcmp对比两个字符串对象 */
 /* Wrapper for compareStringObjectsWithFlags() using binary comparison. */
 int compareStringObjects(robj *a, robj *b) {
     return compareStringObjectsWithFlags(a,b,REDIS_COMPARE_BINARY);
 }
 
+/* 使用strcoll对比两个字符串对象，会根据LC_COLLATE的语言的设置来排序来比较   */
 /* Wrapper for compareStringObjectsWithFlags() using collation. */
 int collateStringObjects(robj *a, robj *b) {
     return compareStringObjectsWithFlags(a,b,REDIS_COMPARE_COLL);
 }
 
+/* 判断两个字符串对象是否相等 */
 /* Equal string objects return 1 if the two objects are the same from the
  * point of view of a string comparison, otherwise 0 is returned. Note that
  * this function is faster then checking for (compareStringObject(a,b) == 0)
@@ -562,6 +566,7 @@ int equalStringObjects(robj *a, robj *b) {
     }
 }
 
+/* 返回字符串对象中字符串的长度 */
 size_t stringObjectLen(robj *o) {
     serverAssertWithInfo(NULL,o,o->type == OBJ_STRING);
     if (sdsEncodedObject(o)) {
@@ -655,6 +660,7 @@ int getLongDoubleFromObjectOrReply(client *c, robj *o, long double *target, cons
     return C_OK;
 }
 
+/* 尝试是否能将对象转换成long long*/
 int getLongLongFromObject(robj *o, long long *target) {
     long long value;
 
@@ -674,6 +680,7 @@ int getLongLongFromObject(robj *o, long long *target) {
     return C_OK;
 }
 
+/* 从对象获取long long，都这直接响应错误 */
 int getLongLongFromObjectOrReply(client *c, robj *o, long long *target, const char *msg) {
     long long value;
     if (getLongLongFromObject(o, &value) != C_OK) {
