@@ -244,6 +244,7 @@ robj *dbRandomKey(redisDb *db) {
     }
 }
 
+/* 同步删除键，同时删除过期字典和键空间字典中的值 */
 /* Delete a key, value, and associated expiration entry if any, from the DB */
 int dbSyncDelete(redisDb *db, robj *key) {
     /* Deleting an entry from the expires dict will not free the sds of
@@ -1055,21 +1056,25 @@ void setExpire(client *c, redisDb *db, robj *key, long long when) {
         rememberSlaveKeyWithExpire(db,key);
 }
 
+/* 获取键的过期时间，如果没有该过期键，返回-1 */
 /* Return the expire time of the specified key, or -1 if no expire
  * is associated with this key (i.e. the key is non volatile) */
 long long getExpire(redisDb *db, robj *key) {
     dictEntry *de;
 
+    /* 过期字典是空的 或者在该字典没有找到过期键，则返回-1 */
     /* No expire? return ASAP */
     if (dictSize(db->expires) == 0 ||
        (de = dictFind(db->expires,key->ptr)) == NULL) return -1;
 
+    /* 再次确认，如果一个键在过期字典空，那就一定在键空间字典中 */
     /* The entry was found in the expire dict, this means it should also
      * be present in the main dict (safety check). */
     serverAssertWithInfo(NULL,key,dictFind(db->dict,key->ptr) != NULL);
-    return dictGetSignedIntegerVal(de);
+    return dictGetSignedIntegerVal(de); /* 返回过期时间 */
 }
 
+/* 告知从库和aof文件，数据库的键过期了 */
 /* Propagate expires into slaves and the AOF file.
  * When a key expires in the master, a DEL operation for this key is sent
  * to all the slaves and the AOF file if enabled.
@@ -1094,6 +1099,7 @@ void propagateExpire(redisDb *db, robj *key, int lazy) {
     decrRefCount(argv[1]);
 }
 
+/* 判断数据库中的键是否过期，如果过期则从数据库中删掉。 */
 int expireIfNeeded(redisDb *db, robj *key) {
     mstime_t when = getExpire(db,key);
     mstime_t now;
@@ -1126,7 +1132,7 @@ int expireIfNeeded(redisDb *db, robj *key) {
     server.stat_expiredkeys++;
     propagateExpire(db,key,server.lazyfree_lazy_expire);
     notifyKeyspaceEvent(NOTIFY_EXPIRED,
-        "expired",key,db->id);
+        "expired",key,db->id); /* 发送键过期通知 */
     return server.lazyfree_lazy_expire ? dbAsyncDelete(db,key) :
                                          dbSyncDelete(db,key);
 }
