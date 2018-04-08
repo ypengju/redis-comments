@@ -3533,6 +3533,9 @@ void setupSignalHandlers(void) {
 
 void memtest(size_t megabytes, int passes);
 
+/* 检查是否以哨兵模式启动的 如果是以哨兵模式启动返回1 否则返回0
+ * 哨兵模式启动有两种方法，一种直接运行 redis-sentinel 一种用./redis-server --sentinel
+ */
 /* Returns 1 if there is --sentinel among the arguments or if
  * argv[0] contains "redis-sentinel". */
 int checkForSentinelMode(int argc, char **argv) {
@@ -3734,12 +3737,12 @@ int main(int argc, char **argv) {
     spt_init(argc, argv);
 #endif
     setlocale(LC_COLLATE,"");
-    zmalloc_set_oom_handler(redisOutOfMemoryHandler);
-    srand(time(NULL)^getpid());
-    gettimeofday(&tv,NULL);
+    zmalloc_set_oom_handler(redisOutOfMemoryHandler); /* 设置oom的处理函数 */
+    srand(time(NULL)^getpid()); /* 设置对接种子 */
+    gettimeofday(&tv,NULL); /* 获取当前时间戳 */
     char hashseed[16];
-    getRandomHexChars(hashseed,sizeof(hashseed));
-    dictSetHashFunctionSeed((uint8_t*)hashseed);
+    getRandomHexChars(hashseed,sizeof(hashseed)); /* 生成一个16字节的随机数，用来做运行id */
+    dictSetHashFunctionSeed((uint8_t*)hashseed); /* 设置为字典的随机种子 */
     server.sentinel_mode = checkForSentinelMode(argc,argv);
     initServerConfig();
     moduleInitModulesSystem();

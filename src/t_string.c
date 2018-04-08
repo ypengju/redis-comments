@@ -33,7 +33,7 @@
 /*-----------------------------------------------------------------------------
  * String Commands
  *----------------------------------------------------------------------------*/
-
+/* 检查字符串的长度不能超过512M */
 static int checkStringLength(client *c, long long size) {
     if (size > 512*1024*1024) {
         addReplyError(c,"string exceeds maximum allowed size (512MB)");
@@ -465,6 +465,7 @@ void appendCommand(client *c) {
     addReplyLongLong(c,totlen);
 }
 
+/* strlen命令的实现 */
 void strlenCommand(client *c) {
     robj *o;
     if ((o = lookupKeyReadOrReply(c,c->argv[1],shared.czero)) == NULL ||

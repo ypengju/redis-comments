@@ -545,6 +545,7 @@ int ld2string(char *buf, size_t len, long double value, int humanfriendly) {
     return l;
 }
 
+/* 生成redis的运行ID,运来区分不同的redis实例 */
 /* Generate the Redis "Run ID", a SHA1-sized random number that identifies a
  * given execution of Redis, so that if you are talking with an instance
  * having run_id == A, and you reconnect and it has run_id == B, you can be
@@ -554,10 +555,12 @@ void getRandomHexChars(char *p, unsigned int len) {
     unsigned int j;
 
     /* Global state. */
-    static int seed_initialized = 0;
-    static unsigned char seed[20]; /* The SHA1 seed, from /dev/urandom. */
+    static int seed_initialized = 0; /* 标记是否设置了随机种子 */
+    /* 从/dev/urandom获取的随机种子 */
+    static unsigned char seed[20]; /* The SHA1 seed, from /dev/urandom. */ 
     static uint64_t counter = 0; /* The counter we hash with the seed. */
 
+    /* 从/dev/urandom读取随机种子 */
     if (!seed_initialized) {
         /* Initialize a seed and use SHA1 in counter mode, where we hash
          * the same seed with a progressive counter. For the goals of this
@@ -588,16 +591,17 @@ void getRandomHexChars(char *p, unsigned int len) {
             p += copylen;
         }
     } else {
+        /* 不能从/dev/urandom获取随机种子，那就用时间戳和进程id来当随机种子 */
         /* If we can't read from /dev/urandom, do some reasonable effort
          * in order to create some entropy, since this function is used to
          * generate run_id and cluster instance IDs */
         char *x = p;
         unsigned int l = len;
         struct timeval tv;
-        pid_t pid = getpid();
+        pid_t pid = getpid(); /* 获取当前进程id */
 
         /* Use time and PID to fill the initial array. */
-        gettimeofday(&tv,NULL);
+        gettimeofday(&tv,NULL); /* 获取时间 */
         if (l >= sizeof(tv.tv_usec)) {
             memcpy(x,&tv.tv_usec,sizeof(tv.tv_usec));
             l -= sizeof(tv.tv_usec);
@@ -622,6 +626,7 @@ void getRandomHexChars(char *p, unsigned int len) {
     }
 }
 
+/* 根据文件名，获取绝对路径 */
 /* Given the filename, return the absolute path as an SDS string, or NULL
  * if it fails for some reason. Note that "filename" may be an absolute path
  * already, this will be detected and handled correctly.

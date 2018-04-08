@@ -49,7 +49,7 @@
 #include <lua.h>
 #include <signal.h>
 
-typedef long long mstime_t; /* millisecond time type. */
+typedef long long mstime_t; /* millisecond time type. */ /* 表示毫秒时间戳 */
 
 #include "ae.h"      /* Event driven programming library */
 #include "sds.h"     /* Dynamic safe strings */
@@ -81,10 +81,10 @@ typedef long long mstime_t; /* millisecond time type. */
 #define CONFIG_DEFAULT_HZ        10      /* Time interrupt calls/sec. */
 #define CONFIG_MIN_HZ            1
 #define CONFIG_MAX_HZ            500
-#define CONFIG_DEFAULT_SERVER_PORT        6379    /* TCP port */
+#define CONFIG_DEFAULT_SERVER_PORT        6379    /* TCP port */ /* 默认端口 */
 #define CONFIG_DEFAULT_TCP_BACKLOG       511     /* TCP listen backlog */
 #define CONFIG_DEFAULT_CLIENT_TIMEOUT       0       /* default client timeout: infinite */
-#define CONFIG_DEFAULT_DBNUM     16
+#define CONFIG_DEFAULT_DBNUM     16 /* 默认创建16个数据库 */
 #define CONFIG_MAX_LINE    1024
 #define CRON_DBS_PER_CALL 16
 #define NET_MAX_WRITES_PER_EVENT (1024*64)
@@ -193,6 +193,7 @@ typedef long long mstime_t; /* millisecond time type. */
 /* Hash table parameters */
 #define HASHTABLE_MIN_FILL        10      /* Minimal hash table fill 10% */
 
+/* 命令标记 */
 /* Command flags. Please check the command table defined in the redis.c file
  * for more information about the meaning of every flag. */
 #define CMD_WRITE (1<<0)            /* "w" flag */
@@ -413,6 +414,7 @@ typedef long long mstime_t; /* millisecond time type. */
 #define RDB_CHILD_TYPE_DISK 1     /* RDB is written to disk. */
 #define RDB_CHILD_TYPE_SOCKET 2   /* RDB is written to slave socket. */
 
+/* 键空间改变通知类型 */
 /* Keyspace changes notification classes. Every class is associated with a
  * character for configuration purposes. */
 #define NOTIFY_KEYSPACE (1<<0)    /* K */
@@ -609,6 +611,7 @@ typedef struct redisObject {
 
 struct evictionPoolEntry; /* Defined in evict.c */
 
+/* 数据库结构 */
 /* Redis database representation. There are multiple databases identified
  * by integers from 0 (the default database) up to the max configured
  * database. The database number is the 'id' field in the structure. */
@@ -618,7 +621,7 @@ typedef struct redisDb {
     dict *blocking_keys;        /* Keys with clients waiting for data (BLPOP)*/
     dict *ready_keys;           /* Blocked keys that received a PUSH */
     dict *watched_keys;         /* WATCHED keys for MULTI/EXEC CAS */
-    int id;                     /* Database ID */
+    int id;                     /* Database ID */ /* 数据库id */
     long long avg_ttl;          /* Average TTL, just for stats */
 } redisDb;
 
@@ -744,6 +747,7 @@ struct moduleLoadQueueEntry {
     robj **argv;
 };
 
+/* 共享对象 */
 struct sharedObjectsStruct {
     robj *crlf, *ok, *err, *emptybulk, *czero, *cone, *cnegone, *pong, *space,
     *colon, *nullbulk, *nullmultibulk, *queued,
@@ -878,6 +882,7 @@ struct clusterState;
 #define CHILD_INFO_TYPE_RDB 0
 #define CHILD_INFO_TYPE_AOF 1
 
+/* redis 数据库结构 */
 struct redisServer {
     /* General */
     pid_t pid;                  /* Main process pid. */
@@ -1189,7 +1194,7 @@ struct redisServer {
     int lua_always_replicate_commands; /* Default replication type. */
     /* Lazy free */
     int lazyfree_lazy_eviction;
-    int lazyfree_lazy_expire;
+    int lazyfree_lazy_expire; /* 是否惰性删除过期键 */
     int lazyfree_lazy_server_del;
     /* Latency monitor */
     long long latency_monitor_threshold;
@@ -1215,6 +1220,20 @@ typedef struct pubsubPattern {
     robj *pattern;
 } pubsubPattern;
 
+
+/* redis命令结构
+ * name: 命令
+ * proc: 实现函数
+ * arity: 命令的参数数量，如果是负数，表示大于等于多少个 如 -3 表示 >=3 个参数
+ * sflags: 命令标记
+ * flags: 对sflags分析后得出的二进制标记
+ * getkeys_proc: 从命令获取键参数的函数，只有之后三个参数不够用时才用
+ * firstkey: 命令的第一个参数是key
+ * lastkey: 命令的最后一个参数是key
+ * keystep: key步长，每个几个参数就是一个key 比如 HMSET myhash field1 "Hello" field2 "World"
+ * microseconds: 执行该命令的总得微秒时间
+ * calls: 执行该命令总的次数
+ */
 typedef void redisCommandProc(client *c);
 typedef int *redisGetKeysProc(struct redisCommand *cmd, robj **argv, int argc, int *numkeys);
 struct redisCommand {
