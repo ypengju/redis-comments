@@ -48,8 +48,8 @@
 #define AE_DONT_WAIT 4
 #define AE_CALL_AFTER_SLEEP 8
 
-#define AE_NOMORE -1
-#define AE_DELETED_EVENT_ID -1
+#define AE_NOMORE -1 /* 定时器的处理函数会有一个返回值，如果返回值不是AE_NOMORE则说明需要继续添加该定时器，返回值为定时时间 */
+#define AE_DELETED_EVENT_ID -1 /* 被删除的定时器事件所用id */
 
 /* Macros */
 #define AE_NOTUSED(V) ((void) V)
@@ -63,41 +63,45 @@ typedef void aeEventFinalizerProc(struct aeEventLoop *eventLoop, void *clientDat
 typedef void aeBeforeSleepProc(struct aeEventLoop *eventLoop);
 
 /* File event structure */
+/* 文件事件结构 */
 typedef struct aeFileEvent {
     int mask; /* one of AE_(READABLE|WRITABLE) */
-    aeFileProc *rfileProc;
-    aeFileProc *wfileProc;
+    aeFileProc *rfileProc; /* 读事件的回调函数 */
+    aeFileProc *wfileProc; /* 写事件的回掉函数 */
     void *clientData;
 } aeFileEvent;
 
 /* Time event structure */
+/* 时间事件结构 */
 typedef struct aeTimeEvent {
-    long long id; /* time event identifier. */
-    long when_sec; /* seconds */
-    long when_ms; /* milliseconds */
-    aeTimeProc *timeProc;
+    long long id; /* time event identifier. */ /* 唯一id */
+    long when_sec; /* seconds */ /* 定时时间秒 */
+    long when_ms; /* milliseconds */ /* 定时时间毫秒 */
+    aeTimeProc *timeProc; /* 时间处理器 */
     aeEventFinalizerProc *finalizerProc;
     void *clientData;
     struct aeTimeEvent *next;
 } aeTimeEvent;
 
 /* A fired event */
+/* 触发事件 */
 typedef struct aeFiredEvent {
     int fd;
     int mask;
 } aeFiredEvent;
 
 /* State of an event based program */
+/* 事件循环的主体状态 */
 typedef struct aeEventLoop {
-    int maxfd;   /* highest file descriptor currently registered */
+    int maxfd;   /* highest file descriptor currently registered */ /* 当前分配的最大的文件描述符 */
     int setsize; /* max number of file descriptors tracked */
-    long long timeEventNextId;
-    time_t lastTime;     /* Used to detect system clock skew */
-    aeFileEvent *events; /* Registered events */
-    aeFiredEvent *fired; /* Fired events */
+    long long timeEventNextId; /* 定时器事件的下个id */
+    time_t lastTime;     /* Used to detect system clock skew */ /* 上次处理的时间戳 */
+    aeFileEvent *events; /* Registered events */ /* 注册事件 */
+    aeFiredEvent *fired; /* Fired events */ /* 触发事件 */
     aeTimeEvent *timeEventHead;
-    int stop;
-    void *apidata; /* This is used for polling API specific data */
+    int stop; /* 标记是否结束 */
+    void *apidata; /* This is used for polling API specific data */ /* 具体的实现方法的api数据 */
     aeBeforeSleepProc *beforesleep;
     aeBeforeSleepProc *aftersleep;
 } aeEventLoop;

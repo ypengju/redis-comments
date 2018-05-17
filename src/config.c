@@ -142,6 +142,7 @@ int yesnotoi(char *s) {
     else return -1;
 }
 
+/* 添加保存条件 */
 void appendServerSaveParams(time_t seconds, int changes) {
     server.saveparams = zrealloc(server.saveparams,sizeof(struct saveparam)*(server.saveparamslen+1));
     server.saveparams[server.saveparamslen].seconds = seconds;
@@ -149,6 +150,7 @@ void appendServerSaveParams(time_t seconds, int changes) {
     server.saveparamslen++;
 }
 
+/* 重置系统的保存策略参数 */
 void resetServerSaveParams(void) {
     zfree(server.saveparams);
     server.saveparams = NULL;
@@ -169,6 +171,7 @@ void queueLoadModule(sds path, sds *argv, int argc) {
     listAddNodeTail(server.loadmodule_queue,loadmod);
 }
 
+/* 加载配置 设置到redisServer中 */
 void loadServerConfigFromString(char *config) {
     char *err = NULL;
     int linenum = 0, totlines, i;
@@ -755,6 +758,7 @@ loaderr:
     exit(1);
 }
 
+/* 加载配置文件和额外的配置项 存储到sds中，然后解析sds，设置到redisServer中 */
 /* Load the server configuration from the specified filename.
  * The function appends the additional configuration directives stored
  * in the 'options' string to the config file before loading.

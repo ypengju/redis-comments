@@ -40,7 +40,7 @@
 
 extern char **environ;
 
-#define REDIS_SENTINEL_PORT 26379
+#define REDIS_SENTINEL_PORT 26379 /* 哨兵的监听端口 */
 
 /* ======================== Sentinel global state =========================== */
 
@@ -442,6 +442,7 @@ void initSentinelConfig(void) {
     server.port = REDIS_SENTINEL_PORT;
 }
 
+/* 哨兵初始化 */
 /* Perform the Sentinel mode initialization. */
 void initSentinel(void) {
     unsigned int j;

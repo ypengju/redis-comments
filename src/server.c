@@ -1251,6 +1251,7 @@ void afterSleep(struct aeEventLoop *eventLoop) {
 
 /* =========================== Server initialization ======================== */
 
+/* 创建共享对象 */
 void createSharedObjects(void) {
     int j;
 
@@ -1343,13 +1344,16 @@ void createSharedObjects(void) {
     shared.maxstring = sdsnew("maxstring");
 }
 
+/* 初始化配置文件 设置默认配置 */
 void initServerConfig(void) {
     int j;
 
+    /* 互斥锁的初始化 */
     pthread_mutex_init(&server.next_client_id_mutex,NULL);
     pthread_mutex_init(&server.lruclock_mutex,NULL);
     pthread_mutex_init(&server.unixtime_mutex,NULL);
 
+    /* 随机一个运行id */
     getRandomHexChars(server.runid,CONFIG_RUN_ID_SIZE);
     server.runid[CONFIG_RUN_ID_SIZE] = '\0';
     changeReplicationId();
@@ -1357,8 +1361,8 @@ void initServerConfig(void) {
     server.configfile = NULL;
     server.executable = NULL;
     server.hz = CONFIG_DEFAULT_HZ;
-    server.arch_bits = (sizeof(long) == 8) ? 64 : 32;
-    server.port = CONFIG_DEFAULT_SERVER_PORT;
+    server.arch_bits = (sizeof(long) == 8) ? 64 : 32; /* 架构是32位的还是64位的 */
+    server.port = CONFIG_DEFAULT_SERVER_PORT; /* 默认的端口号 */
     server.tcp_backlog = CONFIG_DEFAULT_TCP_BACKLOG;
     server.bindaddr_count = 0;
     server.unixsocket = NULL;
@@ -1450,10 +1454,12 @@ void initServerConfig(void) {
     server.always_show_logo = CONFIG_DEFAULT_ALWAYS_SHOW_LOGO;
     server.lua_time_limit = LUA_SCRIPT_TIME_LIMIT;
 
+    /* 初始lru clock */
     unsigned int lruclock = getLRUClock();
     atomicSet(server.lruclock,lruclock);
     resetServerSaveParams();
 
+    /* 添加rdb的保存条件 只要其中一条满足，就保存一次 */
     appendServerSaveParams(60*60,1);  /* save after 1 hour and 1 change */
     appendServerSaveParams(300,100);  /* save after 5 minutes and 100 changes */
     appendServerSaveParams(60,10000); /* save after 1 minute and 10000 changes */
@@ -1611,6 +1617,7 @@ void adjustOpenFilesLimit(void) {
     rlim_t maxfiles = server.maxclients+CONFIG_MIN_RESERVED_FDS;
     struct rlimit limit;
 
+    /* 获取系统文件描述符的限制 */
     if (getrlimit(RLIMIT_NOFILE,&limit) == -1) {
         serverLog(LL_WARNING,"Unable to obtain the current NOFILE limit (%s), assuming 1024 and setting the max clients configuration accordingly.",
             strerror(errno));
@@ -1624,6 +1631,7 @@ void adjustOpenFilesLimit(void) {
             rlim_t bestlimit;
             int setrlimit_error = 0;
 
+            /* 尝试将文件描述符设置成最大 如果不行尝试每次下调16个，直到能设置成功为止 */
             /* Try to set the file limit to match 'maxfiles' or at least
              * to the higher value supported less than maxfiles. */
             bestlimit = maxfiles;
@@ -1720,12 +1728,15 @@ void checkTcpBacklogSettings(void) {
 int listenToPort(int port, int *fds, int *count) {
     int j;
 
+    /* 如果没配置绑定地址，那默认绑定地址为0.0.0.0 */
     /* Force binding of 0.0.0.0 if no bind address is specified, always
      * entering the loop if j == 0. */
     if (server.bindaddr_count == 0) server.bindaddr[0] = NULL;
     for (j = 0; j < server.bindaddr_count || j == 0; j++) {
+        /* 没有设置绑定地址 */
         if (server.bindaddr[j] == NULL) {
             int unsupported = 0;
+            /* 先尝试用IPv6绑定，如果不支持IPv6，再尝试绑定IPv4 */
             /* Bind * for both IPv6 and IPv4, we enter here only if
              * server.bindaddr_count == 0. */
             fds[*count] = anetTcp6Server(server.neterr,port,NULL,
@@ -1813,6 +1824,7 @@ void resetServerStats(void) {
 void initServer(void) {
     int j;
 
+    /* 添加信号处理函数 */
     signal(SIGHUP, SIG_IGN);
     signal(SIGPIPE, SIG_IGN);
     setupSignalHandlers();
@@ -1837,8 +1849,9 @@ void initServer(void) {
     server.clients_paused = 0;
     server.system_memory_size = zmalloc_get_memory_size();
 
-    createSharedObjects();
-    adjustOpenFilesLimit();
+    createSharedObjects(); /* 创建所有的共享对象 */
+    adjustOpenFilesLimit(); /* 跳转系统的文件描述符限制 */
+    /* 创建事件循环 */
     server.el = aeCreateEventLoop(server.maxclients+CONFIG_FDSET_INCR);
     if (server.el == NULL) {
         serverLog(LL_WARNING,
@@ -1846,13 +1859,15 @@ void initServer(void) {
             strerror(errno));
         exit(1);
     }
-    server.db = zmalloc(sizeof(redisDb)*server.dbnum);
+    server.db = zmalloc(sizeof(redisDb)*server.dbnum); /* 申请数据库结构内存 */
 
+    /* 监听端口 */
     /* Open the TCP listening socket for the user commands. */
     if (server.port != 0 &&
         listenToPort(server.port,server.ipfd,&server.ipfd_count) == C_ERR)
         exit(1);
 
+    /* 如果有指定unixsocket，监听unixsocket */
     /* Open the listening Unix domain socket. */
     if (server.unixsocket != NULL) {
         unlink(server.unixsocket); /* don't care if this fails */
@@ -1865,12 +1880,14 @@ void initServer(void) {
         anetNonBlock(NULL,server.sofd);
     }
 
+    /* 检查监听是否成功 */
     /* Abort if there are no listening sockets at all. */
     if (server.ipfd_count == 0 && server.sofd < 0) {
         serverLog(LL_WARNING, "Configured to not listen anywhere, exiting.");
         exit(1);
     }
 
+    /* 创建数据库 */
     /* Create the Redis databases, and initialize other internal state. */
     for (j = 0; j < server.dbnum; j++) {
         server.db[j].dict = dictCreate(&dbDictType,NULL);
@@ -1914,6 +1931,7 @@ void initServer(void) {
     server.repl_good_slaves_count = 0;
     updateCachedTime();
 
+    /* 创建时间定时器，使serverCron函数每100毫秒执行一次 */
     /* Create the timer callback, this is our way to process many background
      * operations incrementally, like clients timeout, eviction of unaccessed
      * expired keys and so forth. */
@@ -1922,6 +1940,7 @@ void initServer(void) {
         exit(1);
     }
 
+    /* 创建接受tcp或者unixsocket的事件处理器 */
     /* Create an event handler for accepting new connections in TCP and Unix
      * domain sockets. */
     for (j = 0; j < server.ipfd_count; j++) {
@@ -3442,6 +3461,7 @@ void usage(void) {
     exit(1);
 }
 
+/* redis的logo 图形 */
 void redisAsciiArt(void) {
 #include "asciilogo.h"
     char *buf = zmalloc(1024*16);
@@ -3705,7 +3725,7 @@ int redisIsSupervised(int mode) {
 int main(int argc, char **argv) {
     struct timeval tv;
     int j;
-
+    /* redis 测试用的 */
 #ifdef REDIS_TEST
     if (argc == 3 && !strcasecmp(argv[1], "test")) {
         if (!strcasecmp(argv[2], "ziplist")) {
@@ -3743,10 +3763,11 @@ int main(int argc, char **argv) {
     char hashseed[16];
     getRandomHexChars(hashseed,sizeof(hashseed)); /* 生成一个16字节的随机数，用来做运行id */
     dictSetHashFunctionSeed((uint8_t*)hashseed); /* 设置为字典的随机种子 */
-    server.sentinel_mode = checkForSentinelMode(argc,argv);
-    initServerConfig();
+    server.sentinel_mode = checkForSentinelMode(argc,argv); /* 检查是否哨兵模式 */
+    initServerConfig(); /* 初始化默认配置 */
     moduleInitModulesSystem();
 
+    /* 获取执行文件的绝对路径，以及启动参数 */
     /* Store the executable path and arguments in a safe place in order
      * to be able to restart the server later. */
     server.executable = getAbsolutePath(argv[0]);
@@ -3762,6 +3783,7 @@ int main(int argc, char **argv) {
         initSentinel();
     }
 
+    /* 检查是否以 redis-check-rdb 或者 redis-check-aof 命令启动*/
     /* Check if we need to start in redis-check-rdb/aof mode. We just execute
      * the program main. However the program is part of the Redis executable
      * so that we can easily execute an RDB check on loading errors. */
@@ -3851,6 +3873,7 @@ int main(int argc, char **argv) {
         serverLog(LL_WARNING, "Configuration loaded");
     }
 
+    /* 检查是否以守护进程的方式启动 */
     server.supervised = redisIsSupervised(server.supervised_mode);
     int background = server.daemonize && !server.supervised;
     if (background) daemonize();
@@ -3858,8 +3881,8 @@ int main(int argc, char **argv) {
     initServer();
     if (background || server.pidfile) createPidFile();
     redisSetProcTitle(argv[0]);
-    redisAsciiArt();
-    checkTcpBacklogSettings();
+    redisAsciiArt(); /* logo */
+    checkTcpBacklogSettings(); /* 检查tcp backlog设置 */
 
     if (!server.sentinel_mode) {
         /* Things not needed when running in Sentinel mode. */
@@ -3868,8 +3891,9 @@ int main(int argc, char **argv) {
         linuxMemoryWarnings();
     #endif
         moduleLoadFromQueue();
-        loadDataFromDisk();
+        loadDataFromDisk(); /* 从磁盘加载数据 */
         if (server.cluster_enabled) {
+            /* 验证集群配置数据 */
             if (verifyClusterConfigWithData() == C_ERR) {
                 serverLog(LL_WARNING,
                     "You can't have keys in a DB different than DB 0 when in "
@@ -3892,8 +3916,8 @@ int main(int argc, char **argv) {
 
     aeSetBeforeSleepProc(server.el,beforeSleep);
     aeSetAfterSleepProc(server.el,afterSleep);
-    aeMain(server.el);
-    aeDeleteEventLoop(server.el);
+    aeMain(server.el); /* 开始事件循环 */
+    aeDeleteEventLoop(server.el); /* 当退出主循环时，删除事件循环 */
     return 0;
 }
 

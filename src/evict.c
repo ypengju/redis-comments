@@ -64,6 +64,7 @@ static struct evictionPoolEntry *EvictionPoolLRU;
  * Implementation of eviction, aging and LRU
  * --------------------------------------------------------------------------*/
 
+/* 获取lru时间戳 */
 /* Return the LRU clock, based on the clock resolution. This is a time
  * in a reduced-bits format that can be used to set and check the
  * object->lru field of redisObject structures. */

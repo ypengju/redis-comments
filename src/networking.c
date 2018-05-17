@@ -67,6 +67,7 @@ int listMatchObjects(void *a, void *b) {
     return equalStringObjects(a,b);
 }
 
+/* 创建一个客户端 */
 client *createClient(int fd) {
     client *c = zmalloc(sizeof(client));
 

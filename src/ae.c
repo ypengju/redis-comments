@@ -60,6 +60,7 @@
     #endif
 #endif
 
+/* 创建事件循环 */
 aeEventLoop *aeCreateEventLoop(int setsize) {
     aeEventLoop *eventLoop;
     int i;
@@ -92,6 +93,7 @@ err:
     return NULL;
 }
 
+/* 获得当前事件循环的大小 */
 /* Return the current set size. */
 int aeGetSetSize(aeEventLoop *eventLoop) {
     return eventLoop->setsize;
@@ -104,6 +106,7 @@ int aeGetSetSize(aeEventLoop *eventLoop) {
  * performed at all.
  *
  * Otherwise AE_OK is returned and the operation is successful. */
+/* 扩大事件循环集合大小 */
 int aeResizeSetSize(aeEventLoop *eventLoop, int setsize) {
     int i;
 
@@ -122,6 +125,7 @@ int aeResizeSetSize(aeEventLoop *eventLoop, int setsize) {
     return AE_OK;
 }
 
+/* 删除事件体 */
 void aeDeleteEventLoop(aeEventLoop *eventLoop) {
     aeApiFree(eventLoop);
     zfree(eventLoop->events);
@@ -129,10 +133,12 @@ void aeDeleteEventLoop(aeEventLoop *eventLoop) {
     zfree(eventLoop);
 }
 
+/* 标记事件循环停止 */
 void aeStop(aeEventLoop *eventLoop) {
     eventLoop->stop = 1;
 }
 
+/* 创建文件事件 */
 int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         aeFileProc *proc, void *clientData)
 {
@@ -171,6 +177,7 @@ void aeDeleteFileEvent(aeEventLoop *eventLoop, int fd, int mask)
     }
 }
 
+/* 根据文件描述符获取文件事件 */
 int aeGetFileEvents(aeEventLoop *eventLoop, int fd) {
     if (fd >= eventLoop->setsize) return 0;
     aeFileEvent *fe = &eventLoop->events[fd];
@@ -178,6 +185,7 @@ int aeGetFileEvents(aeEventLoop *eventLoop, int fd) {
     return fe->mask;
 }
 
+/* 获取当前时间 */
 static void aeGetTime(long *seconds, long *milliseconds)
 {
     struct timeval tv;
@@ -187,6 +195,7 @@ static void aeGetTime(long *seconds, long *milliseconds)
     *milliseconds = tv.tv_usec/1000;
 }
 
+/* 给当前时间添加指定毫秒数 */
 static void aeAddMillisecondsToNow(long long milliseconds, long *sec, long *ms) {
     long cur_sec, cur_ms, when_sec, when_ms;
 
@@ -201,6 +210,7 @@ static void aeAddMillisecondsToNow(long long milliseconds, long *sec, long *ms) 
     *ms = when_ms;
 }
 
+/* 创建时间事件 并添加在定时器链表的头部 */
 long long aeCreateTimeEvent(aeEventLoop *eventLoop, long long milliseconds,
         aeTimeProc *proc, void *clientData,
         aeEventFinalizerProc *finalizerProc)
@@ -220,6 +230,7 @@ long long aeCreateTimeEvent(aeEventLoop *eventLoop, long long milliseconds,
     return id;
 }
 
+/* 删除定时器事件，将其标注为 */
 int aeDeleteTimeEvent(aeEventLoop *eventLoop, long long id)
 {
     aeTimeEvent *te = eventLoop->timeEventHead;
@@ -244,6 +255,7 @@ int aeDeleteTimeEvent(aeEventLoop *eventLoop, long long id)
  *    Much better but still insertion or deletion of timers is O(N).
  * 2) Use a skiplist to have this operation as O(1) and insertion as O(log(N)).
  */
+/* 在时间事件链表中，找到离当前事件最近的事件 */
 static aeTimeEvent *aeSearchNearestTimer(aeEventLoop *eventLoop)
 {
     aeTimeEvent *te = eventLoop->timeEventHead;
@@ -260,11 +272,12 @@ static aeTimeEvent *aeSearchNearestTimer(aeEventLoop *eventLoop)
 }
 
 /* Process time events */
+/* 处理定时器事件 */
 static int processTimeEvents(aeEventLoop *eventLoop) {
-    int processed = 0;
+    int processed = 0; /* 记录触发定时器的个数 */
     aeTimeEvent *te, *prev;
     long long maxId;
-    time_t now = time(NULL);
+    time_t now = time(NULL); /* 当前时间 */
 
     /* If the system clock is moved to the future, and then set back to the
      * right value, time events may be delayed in a random way. Often this
@@ -281,7 +294,7 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
             te = te->next;
         }
     }
-    eventLoop->lastTime = now;
+    eventLoop->lastTime = now; /* 更新时间戳 */
 
     prev = NULL;
     te = eventLoop->timeEventHead;
@@ -291,6 +304,7 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
         long long id;
 
         /* Remove events scheduled for deletion. */
+        /* 移除已经被标记尾删除的定时器 */
         if (te->id == AE_DELETED_EVENT_ID) {
             aeTimeEvent *next = te->next;
             if (prev == NULL)
@@ -313,15 +327,17 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
             te = te->next;
             continue;
         }
-        aeGetTime(&now_sec, &now_ms);
+        aeGetTime(&now_sec, &now_ms); /* 获取当前时间 */
+        /* 当前时间大于等于定时器设置的时间 触发定时器 */
         if (now_sec > te->when_sec ||
             (now_sec == te->when_sec && now_ms >= te->when_ms))
         {
             int retval;
 
             id = te->id;
-            retval = te->timeProc(eventLoop, id, te->clientData);
-            processed++;
+            retval = te->timeProc(eventLoop, id, te->clientData); /* 触发事件的回调函数 */
+            processed++; /* 记录触发的定时器个数 */
+            /* 如果返回值不是AE_NOMORE 则需要重新添加该定时器 否则标记该定时器为删除状态，下次轮询删除掉 */
             if (retval != AE_NOMORE) {
                 aeAddMillisecondsToNow(retval,&te->when_sec,&te->when_ms);
             } else {
@@ -350,8 +366,10 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
  * The function returns the number of events processed. */
 int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 {
+    /* 处理的所有事件的数量 */
     int processed = 0, numevents;
 
+    /* 如果没有文件事件和时间事件，那就不用再检查了 */
     /* Nothing to do? return ASAP */
     if (!(flags & AE_TIME_EVENTS) && !(flags & AE_FILE_EVENTS)) return 0;
 
@@ -370,9 +388,11 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
         if (shortest) {
             long now_sec, now_ms;
 
+            /* 获取当前时间 */
             aeGetTime(&now_sec, &now_ms);
             tvp = &tv;
 
+            /* 计算到触发最近的事件需要多少毫秒 */
             /* How many milliseconds we need to wait for the next
              * time event to fire? */
             long long ms =
@@ -399,14 +419,17 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
             }
         }
 
+        /* 调用多路复用的阻塞接口，最多阻塞timeout时长，或者当有就绪事件时返回 */
         /* Call the multiplexing API, will return only on timeout or when
          * some event fires. */
         numevents = aeApiPoll(eventLoop, tvp);
 
+        /* 唤醒后的回掉函数不为空，并且设置了call的标志，则在唤醒后调用回掉函数 */
         /* After sleep callback. */
         if (eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP)
             eventLoop->aftersleep(eventLoop);
 
+        /* 遍历就绪列表，处理之 */
         for (j = 0; j < numevents; j++) {
             aeFileEvent *fe = &eventLoop->events[eventLoop->fired[j].fd];
             int mask = eventLoop->fired[j].mask;
@@ -427,6 +450,8 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
             processed++;
         }
     }
+
+    /* 如果标记要检查时间事件，就需要检查 */
     /* Check time events */
     if (flags & AE_TIME_EVENTS)
         processed += processTimeEvents(eventLoop);
@@ -434,6 +459,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
     return processed; /* return the number of processed file/time events */
 }
 
+/* 等待指定时长，直到指定的文件描述符可读，可写，或者异常 */
 /* Wait for milliseconds until the given file descriptor becomes
  * writable/readable/exception */
 int aeWait(int fd, int mask, long long milliseconds) {
@@ -456,6 +482,7 @@ int aeWait(int fd, int mask, long long milliseconds) {
     }
 }
 
+/* 事件的主循环 */
 void aeMain(aeEventLoop *eventLoop) {
     eventLoop->stop = 0;
     while (!eventLoop->stop) {
@@ -465,14 +492,17 @@ void aeMain(aeEventLoop *eventLoop) {
     }
 }
 
+/* 获取实现 */
 char *aeGetApiName(void) {
     return aeApiName();
 }
 
+/* 设置阻塞前的回调函数 */
 void aeSetBeforeSleepProc(aeEventLoop *eventLoop, aeBeforeSleepProc *beforesleep) {
     eventLoop->beforesleep = beforesleep;
 }
 
+/* 设置阻塞唤醒后的回掉函数 */
 void aeSetAfterSleepProc(aeEventLoop *eventLoop, aeBeforeSleepProc *aftersleep) {
     eventLoop->aftersleep = aftersleep;
 }

@@ -31,11 +31,13 @@
 
 #include <sys/epoll.h>
 
+/* epoll状态 */
 typedef struct aeApiState {
-    int epfd;
-    struct epoll_event *events;
+    int epfd; /* epoll文件描述符 */
+    struct epoll_event *events; /* epoll事件 */
 } aeApiState;
 
+/* 创建epoll */
 static int aeApiCreate(aeEventLoop *eventLoop) {
     aeApiState *state = zmalloc(sizeof(aeApiState));
 
@@ -55,6 +57,7 @@ static int aeApiCreate(aeEventLoop *eventLoop) {
     return 0;
 }
 
+/* 重置事件大小 */
 static int aeApiResize(aeEventLoop *eventLoop, int setsize) {
     aeApiState *state = eventLoop->apidata;
 
@@ -62,6 +65,7 @@ static int aeApiResize(aeEventLoop *eventLoop, int setsize) {
     return 0;
 }
 
+/* 释放epoll 关闭文件描述符，释放事件内存 */
 static void aeApiFree(aeEventLoop *eventLoop) {
     aeApiState *state = eventLoop->apidata;
 

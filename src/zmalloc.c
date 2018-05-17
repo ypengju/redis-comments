@@ -82,9 +82,10 @@ void zlibc_free(void *ptr) {
     atomicDecr(used_memory,__n); \
 } while(0)
 
-static size_t used_memory = 0;
+static size_t used_memory = 0; /* 记录使用的内存大小 */
 pthread_mutex_t used_memory_mutex = PTHREAD_MUTEX_INITIALIZER;
 
+/* 默认的oom时的时候处理函数 */
 static void zmalloc_default_oom(size_t size) {
     fprintf(stderr, "zmalloc: Out of memory trying to allocate %zu bytes\n",
         size);
@@ -201,6 +202,7 @@ void zfree(void *ptr) {
 #endif
 }
 
+/* 字符串复制 */
 char *zstrdup(const char *s) {
     size_t l = strlen(s)+1;
     char *p = zmalloc(l);
@@ -209,12 +211,14 @@ char *zstrdup(const char *s) {
     return p;
 }
 
+/* 获取使用的内存大小 */
 size_t zmalloc_used_memory(void) {
     size_t um;
     atomicGet(used_memory,um);
     return um;
 }
 
+/* 设置oom的处理函数 */
 void zmalloc_set_oom_handler(void (*oom_handler)(size_t)) {
     zmalloc_oom_handler = oom_handler;
 }
@@ -365,6 +369,7 @@ size_t zmalloc_get_private_dirty(long pid) {
  * 3) Was modified for Redis by Matt Stancliff.
  * 4) This note exists in order to comply with the original license.
  */
+/* 获取本机屋里内存的大小，不同系统获取屋里内存的api不同，该方法是跨平台的 */
 size_t zmalloc_get_memory_size(void) {
 #if defined(__unix__) || defined(__unix) || defined(unix) || \
     (defined(__APPLE__) && defined(__MACH__))

@@ -78,7 +78,7 @@ typedef long long mstime_t; /* millisecond time type. */ /* 表示毫秒时间�
 #define C_ERR                   -1
 
 /* Static server configuration */
-#define CONFIG_DEFAULT_HZ        10      /* Time interrupt calls/sec. */
+#define CONFIG_DEFAULT_HZ        10      /* Time interrupt calls/sec. */ /* 每秒执行10serverCron */
 #define CONFIG_MIN_HZ            1
 #define CONFIG_MAX_HZ            500
 #define CONFIG_DEFAULT_SERVER_PORT        6379    /* TCP port */ /* 默认端口 */
@@ -98,12 +98,12 @@ typedef long long mstime_t; /* millisecond time type. */ /* 表示毫秒时间�
 #define AOF_READ_DIFF_INTERVAL_BYTES (1024*10)
 #define CONFIG_DEFAULT_SLOWLOG_LOG_SLOWER_THAN 10000
 #define CONFIG_DEFAULT_SLOWLOG_MAX_LEN 128
-#define CONFIG_DEFAULT_MAX_CLIENTS 10000
+#define CONFIG_DEFAULT_MAX_CLIENTS 10000 /* 默认最大同时连接10000个客户端 */
 #define CONFIG_AUTHPASS_MAX_LEN 512
 #define CONFIG_DEFAULT_SLAVE_PRIORITY 100
 #define CONFIG_DEFAULT_REPL_TIMEOUT 60
 #define CONFIG_DEFAULT_REPL_PING_SLAVE_PERIOD 10
-#define CONFIG_RUN_ID_SIZE 40
+#define CONFIG_RUN_ID_SIZE 40 /* 运行id的大小 */
 #define RDB_EOF_MARK_SIZE 40
 #define CONFIG_DEFAULT_REPL_BACKLOG_SIZE (1024*1024)    /* 1mb */
 #define CONFIG_DEFAULT_REPL_BACKLOG_TIME_LIMIT (60*60)  /* 1 hour */
@@ -121,10 +121,10 @@ typedef long long mstime_t; /* millisecond time type. */ /* 表示毫秒时间�
 #define CONFIG_DEFAULT_PROTECTED_MODE 1
 #define CONFIG_DEFAULT_LOGFILE ""
 #define CONFIG_DEFAULT_SYSLOG_ENABLED 0
-#define CONFIG_DEFAULT_STOP_WRITES_ON_BGSAVE_ERROR 1
-#define CONFIG_DEFAULT_RDB_COMPRESSION 1
+#define CONFIG_DEFAULT_STOP_WRITES_ON_BGSAVE_ERROR 1 /* bgsave错误时是否停止写入 */
+#define CONFIG_DEFAULT_RDB_COMPRESSION 1 /* 默认rdb文件是需要压缩的 */
 #define CONFIG_DEFAULT_RDB_CHECKSUM 1
-#define CONFIG_DEFAULT_RDB_FILENAME "dump.rdb"
+#define CONFIG_DEFAULT_RDB_FILENAME "dump.rdb" /* 默认rdb文件 */
 #define CONFIG_DEFAULT_REPL_DISKLESS_SYNC 0
 #define CONFIG_DEFAULT_REPL_DISKLESS_SYNC_DELAY 5
 #define CONFIG_DEFAULT_SLAVE_SERVE_STALE_DATA 1
@@ -136,7 +136,7 @@ typedef long long mstime_t; /* millisecond time type. */ /* 表示毫秒时间�
 #define CONFIG_DEFAULT_MAXMEMORY_SAMPLES 5
 #define CONFIG_DEFAULT_LFU_LOG_FACTOR 10
 #define CONFIG_DEFAULT_LFU_DECAY_TIME 1
-#define CONFIG_DEFAULT_AOF_FILENAME "appendonly.aof"
+#define CONFIG_DEFAULT_AOF_FILENAME "appendonly.aof" /* 默认aof文件 */
 #define CONFIG_DEFAULT_AOF_NO_FSYNC_ON_REWRITE 0
 #define CONFIG_DEFAULT_AOF_LOAD_TRUNCATED 1
 #define CONFIG_DEFAULT_AOF_USE_RDB_PREAMBLE 0
@@ -146,8 +146,8 @@ typedef long long mstime_t; /* millisecond time type. */ /* 表示毫秒时间�
 #define CONFIG_DEFAULT_MIN_SLAVES_MAX_LAG 10
 #define NET_IP_STR_LEN 46 /* INET6_ADDRSTRLEN is 46, but we need to be sure */
 #define NET_PEER_ID_LEN (NET_IP_STR_LEN+32) /* Must be enough for ip:port */
-#define CONFIG_BINDADDR_MAX 16
-#define CONFIG_MIN_RESERVED_FDS 32
+#define CONFIG_BINDADDR_MAX 16 /* 最多配置16个绑定地址 */
+#define CONFIG_MIN_RESERVED_FDS 32 /* 最少要保留32个文件描述符给redis自己用 */
 #define CONFIG_DEFAULT_LATENCY_MONITOR_THRESHOLD 0
 #define CONFIG_DEFAULT_SLAVE_LAZY_FLUSH 0
 #define CONFIG_DEFAULT_LAZYFREE_LAZY_EVICTION 0
@@ -325,9 +325,10 @@ typedef long long mstime_t; /* millisecond time type. */ /* 表示毫秒时间�
 #define LL_RAW (1<<10) /* Modifier to log without timestamp */
 #define CONFIG_DEFAULT_VERBOSITY LL_NOTICE
 
+/* 监控选项 */
 /* Supervision options */
-#define SUPERVISED_NONE 0
-#define SUPERVISED_AUTODETECT 1
+#define SUPERVISED_NONE 0 /* 没有 */
+#define SUPERVISED_AUTODETECT 1 /* 自动监测 */
 #define SUPERVISED_SYSTEMD 2
 #define SUPERVISED_UPSTART 3
 
@@ -581,9 +582,9 @@ typedef struct RedisModuleDigest {
 #define OBJ_ENCODING_EMBSTR 8  /* Embedded sds string encoding */
 #define OBJ_ENCODING_QUICKLIST 9 /* Encoded as linked list of ziplists */
 
-#define LRU_BITS 24
-#define LRU_CLOCK_MAX ((1<<LRU_BITS)-1) /* Max value of obj->lru */
-#define LRU_CLOCK_RESOLUTION 1000 /* LRU clock resolution in ms */
+#define LRU_BITS 24 /* lru占24位 */
+#define LRU_CLOCK_MAX ((1<<LRU_BITS)-1) /* Max value of obj->lru */ /* lru的最大值 */
+#define LRU_CLOCK_RESOLUTION 1000 /* LRU clock resolution in ms */ /* lru的时间精度是毫秒 */
 
 /* 最大的int值，表明对象是共享的 */
 #define OBJ_SHARED_REFCOUNT INT_MAX
@@ -616,8 +617,8 @@ struct evictionPoolEntry; /* Defined in evict.c */
  * by integers from 0 (the default database) up to the max configured
  * database. The database number is the 'id' field in the structure. */
 typedef struct redisDb {
-    dict *dict;                 /* The keyspace for this DB */
-    dict *expires;              /* Timeout of keys with a timeout set */
+    dict *dict;                 /* The keyspace for this DB */ /* 键空间，保存数据库中所有的键值对 */
+    dict *expires;              /* Timeout of keys with a timeout set */ /* 过期键 保存所有的过期键和时间 */
     dict *blocking_keys;        /* Keys with clients waiting for data (BLPOP)*/
     dict *ready_keys;           /* Blocked keys that received a PUSH */
     dict *watched_keys;         /* WATCHED keys for MULTI/EXEC CAS */
@@ -736,9 +737,10 @@ typedef struct client {
     char buf[PROTO_REPLY_CHUNK_BYTES];
 } client;
 
+/* 保存条件的参数  多少秒内有多少次改变就保存一次*/
 struct saveparam {
-    time_t seconds;
-    int changes;
+    time_t seconds; //多少秒
+    int changes; //多少次改变
 };
 
 struct moduleLoadQueueEntry {
@@ -885,23 +887,23 @@ struct clusterState;
 /* redis 数据库结构 */
 struct redisServer {
     /* General */
-    pid_t pid;                  /* Main process pid. */
-    char *configfile;           /* Absolute config file path, or NULL */
-    char *executable;           /* Absolute executable file path. */
+    pid_t pid;                  /* Main process pid. */ /* 进程id */
+    char *configfile;           /* Absolute config file path, or NULL */ /* 配置文件绝对路径 */
+    char *executable;           /* Absolute executable file path. */ /* 执行文件的绝对路径*/
     char **exec_argv;           /* Executable argv vector (copy). */
     int hz;                     /* serverCron() calls frequency in hertz */
     redisDb *db;
     dict *commands;             /* Command table */
     dict *orig_commands;        /* Command table before command renaming. */
     aeEventLoop *el;
-    unsigned int lruclock;      /* Clock for LRU eviction */
+    unsigned int lruclock;      /* Clock for LRU eviction */ /* 用于计算键的空转时长，默认每10秒更新一次时钟缓存 */
     int shutdown_asap;          /* SHUTDOWN needed ASAP */
     int activerehashing;        /* Incremental rehash in serverCron() */
     int active_defrag_running;  /* Active defragmentation running (holds current scan aggressiveness) */
     char *requirepass;          /* Pass for AUTH command, or NULL */
     char *pidfile;              /* PID file path */
     int arch_bits;              /* 32 or 64 depending on sizeof(long) */
-    int cronloops;              /* Number of times the cron function run */
+    int cronloops;              /* Number of times the cron function run */ /* serverCron执行的次数 */
     char runid[CONFIG_RUN_ID_SIZE+1];  /* ID always different at every exec. */
     int sentinel_mode;          /* True if this instance is a Sentinel. */
     size_t initial_memory_usage; /* Bytes used after initialization. */
@@ -915,8 +917,8 @@ struct redisServer {
     /* Networking */
     int port;                   /* TCP listening port */
     int tcp_backlog;            /* TCP listen() backlog */
-    char *bindaddr[CONFIG_BINDADDR_MAX]; /* Addresses we should bind to */
-    int bindaddr_count;         /* Number of addresses in server.bindaddr[] */
+    char *bindaddr[CONFIG_BINDADDR_MAX]; /* Addresses we should bind to */ /* 绑定地址数组 */
+    int bindaddr_count;         /* Number of addresses in server.bindaddr[] */ /* 绑定地址的数量 */
     char *unixsocket;           /* UNIX socket path */
     mode_t unixsocketperm;      /* UNIX socket permission */
     int ipfd[CONFIG_BINDADDR_MAX]; /* TCP socket file descriptors */
@@ -1038,8 +1040,8 @@ struct redisServer {
     long long dirty;                /* Changes to DB from the last save */
     long long dirty_before_bgsave;  /* Used to restore dirty on failed BGSAVE */
     pid_t rdb_child_pid;            /* PID of RDB saving child */
-    struct saveparam *saveparams;   /* Save points array for RDB */
-    int saveparamslen;              /* Number of saving points */
+    struct saveparam *saveparams;   /* Save points array for RDB */ /* rdb的保存条件 */
+    int saveparamslen;              /* Number of saving points */ /* 保存条件的数组大小 */
     char *rdb_filename;             /* Name of RDB file */
     int rdb_compression;            /* Use compression in RDB? */
     int rdb_checksum;               /* Use RDB checksum? */

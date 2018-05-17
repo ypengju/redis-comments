@@ -642,11 +642,13 @@ sds getAbsolutePath(char *filename) {
     relpath = sdstrim(relpath," \r\n\t");
     if (relpath[0] == '/') return relpath; /* Path is already absolute. */
 
+    /* 获取当前目录的绝对地址，保存在cwd中 */
     /* If path is relative, join cwd and relative path. */
     if (getcwd(cwd,sizeof(cwd)) == NULL) {
         sdsfree(relpath);
         return NULL;
     }
+    /* 目录最后加上/ */
     abspath = sdsnew(cwd);
     if (sdslen(abspath) && abspath[sdslen(abspath)-1] != '/')
         abspath = sdscat(abspath,"/");
@@ -657,10 +659,13 @@ sds getAbsolutePath(char *filename) {
      *
      * For every "../" we find in the filename, we remove it and also remove
      * the last element of the cwd, unless the current cwd is "/". */
+    /* 如果相对路径是以../开始的， */
     while (sdslen(relpath) >= 3 &&
            relpath[0] == '.' && relpath[1] == '.' && relpath[2] == '/')
     {
+        /* 将相对路径的../去掉 */
         sdsrange(relpath,3,-1);
+        /* 将绝路路径中不是以结尾的/部分去掉 */
         if (sdslen(abspath) > 1) {
             char *p = abspath + sdslen(abspath)-2;
             int trimlen = 1;
@@ -673,6 +678,7 @@ sds getAbsolutePath(char *filename) {
         }
     }
 
+    /* 将绝对路径和相对路径连接 */
     /* Finally glue the two parts together. */
     abspath = sdscatsds(abspath,relpath);
     sdsfree(relpath);
